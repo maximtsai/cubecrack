@@ -4945,6 +4945,7 @@ uniform float uDim;
                     s.classList.remove('victory-bounce');
                 });
                 hud.overlay.classList.remove('show');
+                document.body.classList.remove('has-overlay');
                 // Reset card visibility
                 const winCard = document.getElementById('winCard');
                 if (winCard) winCard.style.display = 'flex';
@@ -6395,13 +6396,17 @@ uniform float uDim;
             // ---------- fossilized tree trunk ----------
             // Concentric-ring breakage. Distance is measured inside the ring shell: freely
             // around the ring's circumference and up/down the trunk, but radial separation is
-            // weighted up hard, so a break spreads along the layer it landed on and can't reach
-            // into the layer underneath.
-            const RING_RADIAL = 3.2;
+            // weighted up, so a break spreads along the layer it landed on and doesn't drill
+            // straight through to the core.
+            const RING_RADIAL = 2.6;
             function ringDist(c, hitLocal) {
                 const rC = Math.hypot(c.centroid.x, c.centroid.z);
                 const rH = Math.hypot(hitLocal.x, hitLocal.z);
-                const dr = (rC - rH) * RING_RADIAL;
+                // End-cap strikes (near top/bottom faces) soften radial weight so fractures
+                // spread across the circular cross-section rather than forming single-ring slits.
+                const isEndCap = shape && shape.bound && Math.abs(hitLocal.y) > (shape.bound.y * 0.78);
+                const radialWeight = isEndCap ? 1.3 : RING_RADIAL;
+                const dr = (rC - rH) * radialWeight;
                 const dy = c.centroid.y - hitLocal.y;
                 let da = Math.atan2(c.centroid.z, c.centroid.x) - Math.atan2(hitLocal.z, hitLocal.x);
                 while (da > Math.PI) da -= Math.PI * 2;
@@ -6411,12 +6416,13 @@ uniform float uDim;
             }
 
             // Petrified wood: the fossilized bark shell crazes first (pale amber fault lines)
-            // and only peels away on a second strike. Under it, the trunk comes apart one
-            // concentric ring layer at a time — an inner ring is shielded until the layer
-            // wrapped around it is gone, so the whole trunk unwraps from the outside in.
+            // and peels away on a second strike. Under it, the trunk comes apart in natural
+            // curved ring plates from the outside in.
             function petrifiedImpact(hitWorld, R) {
                 const hit = swing.hitChunk;
                 if (!hit) return;
+
+                // First strike on undamaged bark: crack and split the outer bark shell
                 if (hit.bark && !hit.damaged) {
                     const DR = R * 1.6;
                     for (const c of chunks) {
@@ -6430,16 +6436,46 @@ uniform float uDim;
                     }
                     return;
                 }
+
+                // Second strike on bark OR strike on exposed inner wood layers
                 const BR = R * 1.7;
                 const toDetach = [];
+                const isEndCap = shape && shape.bound && Math.abs(swing.hitLocal.y) > (shape.bound.y * 0.78);
+                const maxRingDiff = isEndCap ? 2 : 1;
+
                 for (const c of chunks) {
-                    if (!c.alive || c.ring !== hit.ring) continue; // stay inside this ring layer
-                    const d = ringDist(c, swing.hitLocal);
-                    if (d < BR && (c === hit || !c.bark || c.damaged)) toDetach.push(c);
-                    else if (c.bark && !c.damaged && d < BR * 1.4) markDamaged(c, swing.hitLocal, BR * 1.4, WOOD_SPLIT);
-                    else if (d < BR * 1.6) scorchChunk(c, 0.94);
+                    if (!c.alive) continue;
+                    const ringDiff = Math.abs(c.ring - hit.ring);
+                    if (ringDiff > maxRingDiff) continue;
+
+                    // Small distance multiplier for cross-ring shards so current layer breaks preferentially
+                    const distMul = (ringDiff === 0) ? 1.0 : (1.0 + ringDiff * 0.32);
+                    const d = ringDist(c, swing.hitLocal) * distMul;
+
+                    if (hit.bark) {
+                        // Bark peeling: detach any piece in core impact radius or any damaged piece in blast
+                        if (c.bark) {
+                            if (d < BR * 0.88 || (c.damaged && d < BR) || c === hit) {
+                                toDetach.push(c);
+                            } else if (!c.damaged && d < BR * 1.4) {
+                                markDamaged(c, swing.hitLocal, BR * 1.4, WOOD_SPLIT);
+                            }
+                        }
+                    } else {
+                        // Inner ring shards: detach pieces in current/adjacent ring within blast radius
+                        if (!c.bark) {
+                            if (d < BR || c === hit) {
+                                toDetach.push(c);
+                            } else if (d < BR * 1.6) {
+                                scorchChunk(c, 0.94);
+                            }
+                        }
+                    }
                 }
-                for (let i = toDetach.length - 1; i >= 0; i--) detachChunk(toDetach[i], hitWorld);
+
+                for (let i = toDetach.length - 1; i >= 0; i--) {
+                    detachChunk(toDetach[i], hitWorld);
+                }
             }
 
             // ---- honeycomb hive ----
@@ -7467,6 +7503,7 @@ uniform float uDim;
                     }
 
                     hud.overlay.classList.add('show');
+                    document.body.classList.add('has-overlay');
                     bus('audio:play', { sfx: 'win' });
                 }, 650);
             }

@@ -595,12 +595,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(8, 7, 6, 0.55);
+            background: rgba(8, 7, 6, 0.72);
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.6s ease;
+            transition: opacity 0.45s ease;
             overflow-y: auto;
             padding: calc(var(--u) * 20) calc(var(--u) * 10);
+            z-index: 100000;
         }
 
         #overlay.show {
@@ -608,30 +609,57 @@
             pointer-events: auto;
         }
 
+        /* Cleanly hide HUD and tool bar when victory or championship card is active */
+        body.has-overlay #hud,
+        body.has-overlay #level-select-btn,
+        body.has-overlay #options-btn {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s ease;
+        }
+
         .card {
             text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: calc(var(--u) * 18);
+            gap: calc(var(--u) * 14);
+        }
+
+        #winCard {
+            background: linear-gradient(135deg, #241e18 0%, #15120e 100%);
+            border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.40);
+            border-radius: calc(var(--u) * 16);
+            padding: calc(var(--u) * 28) calc(var(--u) * 32);
+            width: 90%;
+            max-width: calc(var(--u) * 440);
+            box-shadow: 0 calc(var(--u) * 16) calc(var(--u) * 48) rgba(0, 0, 0, 0.85);
+            transform: scale(0.94);
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #overlay.show #winCard {
+            transform: scale(1);
         }
 
         .card h2 {
-            font-size: calc(var(--u) * 34);
+            font-size: calc(var(--u) * 30);
             font-weight: 700;
-            letter-spacing: 0.4em;
-            text-indent: 0.4em;
+            letter-spacing: 0.28em;
+            text-indent: 0.28em;
             color: var(--gold);
+            margin: 0;
         }
 
         .card p {
             font-family: ui-sans-serif, system-ui, sans-serif;
-            font-size: calc(var(--u) * 26);
+            font-size: calc(var(--u) * 22);
             letter-spacing: 0.08em;
             text-transform: uppercase;
             text-indent: 0.08em;
             max-width: 90vw;
             color: var(--dim);
+            margin: 0;
         }
 
         /* End-of-level star ranking (bronze / silver / gold). Tier colours are pushed onto
@@ -640,8 +668,9 @@
             display: flex;
             gap: calc(var(--u) * 24);
             line-height: 1;
-            font-size: calc(var(--u) * 72);
-            min-height: calc(var(--u) * 78);
+            font-size: calc(var(--u) * 64);
+            min-height: calc(var(--u) * 70);
+            margin: calc(var(--u) * 4) 0;
         }
 
         .win-star {
@@ -654,8 +683,8 @@
 
         .win-star.earned {
             color: var(--rank-color, #e8c98a);
-            text-shadow: 0 0 calc(var(--u) * 18) var(--rank-glow, rgba(232, 201, 138, 0.75)),
-                0 0 calc(var(--u) * 38) var(--rank-glow, rgba(232, 201, 138, 0.5));
+            text-shadow: 0 0 calc(var(--u) * 16) var(--rank-glow, rgba(232, 201, 138, 0.75)),
+                0 0 calc(var(--u) * 32) var(--rank-glow, rgba(232, 201, 138, 0.5));
             animation: winStarPop 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
@@ -726,33 +755,68 @@
         #winRank {
             font-family: Cinzel, serif;
             font-weight: 700;
-            font-size: calc(var(--u) * 26);
+            font-size: calc(var(--u) * 24);
             letter-spacing: 0.22em;
             text-indent: 0.22em;
-            min-height: calc(var(--u) * 30);
+            min-height: calc(var(--u) * 28);
             text-transform: uppercase;
+        }
+
+        #winBest {
+            font-family: Cinzel, serif;
+            font-size: calc(var(--u) * 20);
+            letter-spacing: 0.12em;
+            color: var(--dim);
+            font-weight: 500;
+            margin-top: calc(var(--u) * 2);
+        }
+
+        #winRing {
+            font-family: Cinzel, serif;
+            font-size: calc(var(--u) * 20);
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: #ffd166;
+            background: rgba(255, 209, 102, 0.12);
+            border: calc(var(--u) * 1.5) solid rgba(255, 209, 102, 0.5);
+            border-radius: calc(var(--u) * 20);
+            padding: calc(var(--u) * 4) calc(var(--u) * 16);
+            display: inline-block;
+        }
+
+        #winRing:empty {
+            display: none;
         }
 
         .card button {
             margin-top: calc(var(--u) * 10);
             font-family: Cinzel, serif;
-            font-size: calc(var(--u) * 28);
+            font-size: calc(var(--u) * 26);
             font-weight: 700;
             letter-spacing: 0.2em;
             text-indent: 0.2em;
             color: #14110e;
-            background: var(--gold);
+            background: linear-gradient(180deg, #f3d89d 0%, #d8b26e 100%);
             border: none;
-            padding: calc(var(--u) * 24) calc(var(--u) * 40);
+            padding: calc(var(--u) * 18) calc(var(--u) * 36);
             cursor: pointer;
-            min-height: calc(var(--u) * 96);
-            border-radius: calc(var(--u) * 4);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            min-height: calc(var(--u) * 64);
+            width: 100%;
+            max-width: calc(var(--u) * 340);
+            border-radius: calc(var(--u) * 8);
+            box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 16) rgba(0, 0, 0, 0.4);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
         }
 
         .card button:hover {
             transform: translateY(calc(var(--u) * -2));
-            box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 24) rgba(232, 201, 138, 0.35);
+            filter: brightness(1.06);
+            box-shadow: 0 calc(var(--u) * 8) calc(var(--u) * 24) rgba(232, 201, 138, 0.4);
+        }
+
+        .card button:active {
+            transform: translateY(calc(var(--u) * 1)) scale(0.98);
+            box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 8) rgba(0, 0, 0, 0.6);
         }
 
         /* loading screen */
