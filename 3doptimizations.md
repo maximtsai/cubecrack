@@ -739,6 +739,27 @@ window.addEventListener('pointerdown', function unlockAudioOnFirstGesture() {
 
 When the first strike occurs or music starts, all `AudioBuffer` objects are already resident in RAM and ready for instantaneous playback with 0ms latency.
 
+## 19. Affine container-relative UI scaling (`--u`) across all viewports
+
+### The Problem
+Fixed-pixel (`px`) UI dimensions result in buttons and text that are either too large on small mobile screens (covering gameplay area and wrapping text awkwardly) or tiny on large 4K / desktop displays. Conversely, pure `vmin`/`vw` scaling shrinks UI into illegibility on phones.
+
+### The Solution: Affine Scaling with a Readability Floor
+Derive a single design-pixel scale factor `--u` from container dimensions:
+```js
+// (6 + 1.0 * min(w, h)/100) / 16
+const uPx = (6 + 1.0 * Math.min(w, h) / 100) / 16;
+document.documentElement.style.setProperty('--u', uPx + 'px');
+```
+
+- **Flat `6px` Floor**: Preserves touch target sizes and font legibility on compact phones.
+- **Proportional Scaling**: Expands smoothly and crisply on tablets and desktop monitors.
+- **Every UI Dimension Authored as `calc(var(--u) * N)`**:
+  - `h1`: `font-size: calc(var(--u) * 26);`
+  - `.tool-btn`: `width: calc(var(--u) * 134.4); height: calc(var(--u) * 134.4);`
+  - `.level-select-btn`: `height: calc(var(--u) * 132);`
+  - `.options-card`: `padding: calc(var(--u) * 30) calc(var(--u) * 40);`
+
 ---
 
 ## Checklist
@@ -760,6 +781,7 @@ When the first strike occurs or music starts, all `AudioBuffer` objects are alre
 - [ ] Comprehensive shader pre-warming (`renderer.compile` + warm render of idle tools, shockwaves, debris, and particle pools during level `build()`)
 - [ ] Eliminate forced DOM reflow (`offsetHeight` / `offsetWidth`) inside hit handlers and screen flashes (use GPU-composited CSS keyframes + `requestAnimationFrame`)
 - [ ] Asynchronously pre-decode WebAudio buffers (`decodeAudioData`) on page load in suspended `AudioContext`
+- [ ] Scale all HUD/UI elements with an affine container unit `--u` (`calc(var(--u) * N)`)
 - [ ] Regression-test the tier table: desktop, iPad-with-desktop-UA, Mac, masked renderer
 
 **Robustness**
