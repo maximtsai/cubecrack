@@ -173,28 +173,19 @@
             <p id="winRing" style="font-family: monospace; font-size: 24px; letter-spacing: 0.08em; min-height: 28px; color: #ffd166;"></p>
             <button id="again">NEXT TRIAL</button>
         </div>
-        <div class="card" id="endCard"
-            style="display: none; width: 100%; max-width: 480px; padding: 30px; background: linear-gradient(135deg, #221d18 0%, #14110e 100%); border: 2px solid rgba(232, 201, 138, 0.3); border-radius: 12px; box-shadow: 0 15px 45px rgba(0, 0, 0, 0.7); text-align: center; flex-direction: column; gap: 24px; margin: auto;">
-            <h2 id="endTitle" style="font-size: 32px; color: var(--gold); letter-spacing: 0.15em;">CHAMPIONSHIP COMPLETE
-            </h2>
-            <p id="endSubtitle"
-                style="font-size: 24px; color: var(--gold); letter-spacing: 0.08em; text-transform: uppercase;">GAME
-                SCOREBOARD
-            </p>
-            <div id="levelStats" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+        <div class="card" id="endCard">
+            <h2 id="endTitle">CHAMPIONSHIP COMPLETE</h2>
+            <p id="endSubtitle">GAME SCOREBOARD</p>
+            <div id="levelStats">
                 <!-- Level score lines will be injected here -->
             </div>
-            <div id="totalStats"
-                style="font-size: 26px; color: var(--gold); font-weight: bold; letter-spacing: 0.05em; border-top: 1px solid rgba(232, 201, 138, 0.15); border-bottom: 1px solid rgba(232, 201, 138, 0.15); padding: 12px 0;">
+            <div id="totalStats">
                 TOTAL HITS: <span id="totalHitsCount">0</span>
             </div>
 
             <!-- Leaderboard -->
 
-
-            <button id="restartGame"
-                style="font-family: Cinzel, serif; font-size: 28px; font-weight: 700; letter-spacing: 0.2em; color: #14110e; background: var(--gold); border: none; padding: 24px 30px; min-height: 96px; cursor: pointer; width: 100%; border-radius: 4px; transition: transform 0.15s ease, box-shadow 0.15s ease;">START
-                OVER</button>
+            <button id="restartGame">START OVER</button>
         </div>
     </div>
 

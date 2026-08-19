@@ -3644,6 +3644,9 @@ uniform float uDim;
                     if (seq !== hintSeq) return; // a newer hint superseded this one
                     hud.hint.textContent = key ? (window._t ? window._t(key, replacementObj) : key) : '';
                     hud.hint.classList.remove('fade');
+                    hud.hint.classList.remove('accent');
+                    void hud.hint.offsetWidth;
+                    hud.hint.classList.add('accent');
                 }, 250);
             }
 
@@ -7592,10 +7595,7 @@ uniform float uDim;
                         const hitsFormatted = window._t('levelHitsLabel', { hits: window.hitsPerLevel[idx] });
 
                         const row = document.createElement('div');
-                        row.style.display = 'flex';
-                        row.style.justifyContent = 'space-between';
-                        row.style.fontSize = '24px';
-                        row.style.color = 'var(--dim)';
+                        row.className = 'level-stat-row';
                         row.innerHTML = `<span>${localizedName}</span><span style="font-family: monospace; color: var(--gold);">${hitsFormatted}${window.rankRowMarkup(idx, window.hitsPerLevel[idx])}</span>`;
                         levelStatsContainer.appendChild(row);
                     });
