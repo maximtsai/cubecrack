@@ -1,0 +1,37 @@
+// Asset Map
+
+const assets = {
+  "hammer_strike": {
+    "url": "audio/hammer_strike.mp3",
+    "type": "audio"
+  },
+  "archaeological_bgm": {
+    "url": "audio/archaeological_bgm.mp3",
+    "type": "audio"
+  },
+  "ice_crack": {
+    "url": "audio/ice_crack.mp3",
+    "type": "audio"
+  },
+  "ice_crack_2": {
+    "url": "audio/ice_crack_2.mp3",
+    "type": "audio"
+  },
+  "soft_bounce": {
+    "url": "audio/soft_bounce.mp3",
+    "type": "audio"
+  },
+  "metal_thud_1": {
+    "url": "audio/metal_thud_1.mp3",
+    "type": "audio"
+  },
+  "metal_thud_2": {
+    "url": "audio/metal_thud_2.mp3",
+    "type": "audio"
+  },
+  "metal_thud_3": {
+    "url": "audio/metal_thud_3.mp3",
+    "type": "audio"
+  }
+};
+
