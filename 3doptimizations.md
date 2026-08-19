@@ -7,6 +7,7 @@ fixes can be applied to other Three.js games.
 **Part 1 (§0–§10)** is performance: making the frame rate acceptable.
 **Part 2 (§11–§15)** is robustness: making the game start and stay running at all. Both
 matter on the same hardware, and to the player both failures look the same.
+**Part 3 (§16–§23)** is interaction responsiveness, shader pre-warming, audio latency, responsive UI scaling, and motion damping.
 
 The problem devices:
 
@@ -760,6 +761,68 @@ document.documentElement.style.setProperty('--u', uPx + 'px');
   - `.level-select-btn`: `height: calc(var(--u) * 132);`
   - `.options-card`: `padding: calc(var(--u) * 30) calc(var(--u) * 40);`
 
+## 20. Framerate-independent particle emission (`dt` accumulator pattern)
+
+### The Problem
+Using per-frame random checks (`if (Math.random() < 0.65) spawnSparkle()`) causes high-refresh rate displays (120Hz/144Hz iPhones, Androids, and gaming monitors) to emit **2× to 2.4× more particles per second** than 60Hz displays. On mobile GPUs, this overdraw spikes fillrate and causes battery drain and thermal throttling.
+
+### The Solution: Fixed `dt` Accumulator
+```js
+c.sparkT = (c.sparkT || 0) + scaledDt;
+while (c.sparkT >= 0.038) { // 0.038s = ~26 sparkles/sec constant rate
+    spawnSparkle(c.t.group.position, c.t.sprite.material.color);
+    c.sparkT -= 0.038;
+}
+```
+
+---
+
+## 21. Container-scoped `ResizeObserver` for portal & iframe resiliency
+
+### The Problem
+Listening only to `window.addEventListener('resize')` fails when the game is embedded inside an iframe, portal widget, or dynamic responsive container whose dimensions change without a window resize event firing.
+
+### The Solution: Observe the Canvas Container Directly
+```js
+if (window.ResizeObserver && canvasHost) {
+    if (window._cubeRo) window._cubeRo.disconnect();
+    window._cubeRo = new ResizeObserver(() => updateSize());
+    window._cubeRo.observe(canvasHost);
+} else {
+    window.addEventListener('resize', updateSize, { passive: true });
+}
+```
+
+---
+
+## 22. Exact exponential decay interpolation (`1 - exp(-k * dt)`)
+
+### The Problem
+Linear interpolation approximations like `lerp(a, b, dt * speed)` are framerate-dependent: they lag behind at 30 FPS and can overshoot or oscillate when `dt * speed > 1`.
+
+### The Solution: Framerate-Invariant Exponential Decay
+```js
+// Time scale damping
+const timeScaleDecay = 1 - Math.exp(-8.0 * dt);
+globalTimeScale = THREE.MathUtils.lerp(globalTimeScale, targetTimeScale, timeScaleDecay);
+
+// Camera zoom / level transition damping
+const camDecay = 1 - Math.exp(-24.0 * dt);
+camera.position.lerp(targetCamPos, camDecay);
+```
+
+---
+
+## 23. Player-toggleable accessibility settings (Screen Shake & Haptics)
+
+### The Problem
+Aggressive screen shake and haptics can cause discomfort for motion-sensitive players, while other players enjoy maximum tactile punch.
+
+### The Solution: Dedicated Settings with Persistence
+- **Screen Shake Toggle**: Global toggle (`window.screenShakeEnabled`), always available across all platforms in the Options dialog.
+- **Haptics Toggle**: Platform-gated (`window.hapticsEnabled`), available on vibration/mobile devices.
+- **Settings Persistence**: Values saved to `localStorage` (`cube_cracker_screen_shake` and `cube_cracker_haptics`) and synchronized with all localization languages.
+
 ---
 
 ## Checklist
@@ -782,6 +845,10 @@ document.documentElement.style.setProperty('--u', uPx + 'px');
 - [ ] Eliminate forced DOM reflow (`offsetHeight` / `offsetWidth`) inside hit handlers and screen flashes (use GPU-composited CSS keyframes + `requestAnimationFrame`)
 - [ ] Asynchronously pre-decode WebAudio buffers (`decodeAudioData`) on page load in suspended `AudioContext`
 - [ ] Scale all HUD/UI elements with an affine container unit `--u` (`calc(var(--u) * N)`)
+- [ ] Use `dt` accumulator pattern for continuous particle emission across 60Hz/120Hz displays
+- [ ] Container-scoped `ResizeObserver` for portal and iframe embed resiliency
+- [ ] Framerate-independent exponential decay smoothing (`1 - exp(-k * dt)`) for camera and time interpolation
+- [ ] Dedicated Screen Shake & Haptics accessibility options with persistence
 - [ ] Regression-test the tier table: desktop, iPad-with-desktop-UA, Mac, masked renderer
 
 **Robustness**
