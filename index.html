@@ -150,7 +150,7 @@
             flex-direction: column;
             align-items: center;
             /* Leave a little more breathing room beneath a wrapped level title. */
-            gap: 26px;
+            gap: calc(var(--u) * 26);
         }
 
         h1 {
@@ -287,14 +287,14 @@
             position: absolute;
             inset: 0;
             transform: rotate(45deg);
-            border: 1px solid rgba(232, 222, 204, 0.42);
+            border: calc(var(--u) * 1) solid rgba(232, 222, 204, 0.42);
             transition: all 0.5s ease;
         }
 
         .slot.lit {
             border-color: transparent;
             background: var(--slot-color);
-            box-shadow: 0 0 35px 8px var(--slot-glow);
+            box-shadow: 0 0 calc(var(--u) * 35) calc(var(--u) * 8) var(--slot-glow);
             animation: slotPop 0.7s cubic-bezier(.3, 1.9, .4, 1);
         }
 
