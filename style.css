@@ -22,6 +22,7 @@
             overflow: hidden;
             /* stop iOS rubber-band / pull-to-refresh from moving the canvas */
             overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
         }
 
         body {
@@ -49,6 +50,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        #stage,
+        #game-container {
+            overscroll-behavior: none;
         }
 
         #game-container {
@@ -113,8 +119,10 @@
             align-items: center;
             justify-content: space-between;
             /* keep the title/hint clear of notches and rounded corners */
-            padding:
-                calc(calc(var(--u) * 28) + env(safe-area-inset-top)) calc(calc(var(--u) * 24) + env(safe-area-inset-right)) calc(calc(var(--u) * 34) + env(safe-area-inset-bottom)) calc(calc(var(--u) * 24) + env(safe-area-inset-left));
+            padding-top: max(calc(var(--u) * 28), env(safe-area-inset-top));
+            padding-right: max(calc(var(--u) * 24), env(safe-area-inset-right));
+            padding-bottom: max(calc(var(--u) * 34), env(safe-area-inset-bottom));
+            padding-left: max(calc(var(--u) * 24), env(safe-area-inset-left));
         }
 
         #top {
@@ -393,14 +401,13 @@
         }
 
         .tool-btn {
-            /* 40% larger tools: clearer icons and generous thumb targets on mobile. */
-            width: calc(var(--u) * 134.4);
-            height: calc(var(--u) * 134.4);
+            width: calc(var(--u) * 121);
+            height: calc(var(--u) * 121);
             border-radius: 50%;
             background: rgba(34, 29, 24, 0.65);
             border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.5);
             color: var(--gold);
-            font-size: calc(var(--u) * 58.8);
+            font-size: calc(var(--u) * 53);
             line-height: 1;
             display: flex;
             align-items: center;
@@ -833,8 +840,8 @@
         .level-select-btn {
             position: fixed;
             /* Align with the Options control; the title's narrowed wrap-safe column stays clear. */
-            top: calc(calc(var(--u) * 6) + env(safe-area-inset-top));
-            left: calc(calc(var(--u) * -14) + env(safe-area-inset-left));
+            top: max(calc(var(--u) * 6), env(safe-area-inset-top));
+            left: max(calc(var(--u) * -14), env(safe-area-inset-left));
             height: calc(var(--u) * 132);
             min-width: calc(var(--u) * 132);
             padding: 0 calc(var(--u) * 38);
@@ -958,8 +965,8 @@
         /* Options Button */
         .options-btn {
             position: fixed;
-            top: calc(calc(var(--u) * 24) + env(safe-area-inset-top));
-            right: calc(calc(var(--u) * 24) + env(safe-area-inset-right));
+            top: max(calc(var(--u) * 24), env(safe-area-inset-top));
+            right: max(calc(var(--u) * 24), env(safe-area-inset-right));
             width: calc(var(--u) * 108);
             height: calc(var(--u) * 108);
             border-radius: 50%;

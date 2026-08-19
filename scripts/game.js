@@ -1075,6 +1075,17 @@
         // Kept as a legacy alias for the gameplay script; the canonical list lives in I18N.
         window.LEVEL_NAME_KEYS = window.I18N.levelNameKeys;
 
+        
+        // Global Escape Key to close open overlays (Options / Level Select)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const opt = document.getElementById('options-overlay');
+                const lvl = document.getElementById('level-overlay');
+                if (opt && opt.classList.contains('show')) opt.classList.remove('show');
+                if (lvl && lvl.classList.contains('show')) lvl.classList.remove('show');
+            }
+        });
+
         window.renderLevelList = function () {
             const list = document.getElementById('level-list');
             if (!list) return;
@@ -2028,6 +2039,21 @@
                 return 'audio/' + id + '.mp3';
             }
 
+            
+            // Hybrid decodeAudioData wrapper: supports modern Promise API & legacy callback-only Safari
+            function decodeAudioDataSafe(audioCtx, arrayBuffer) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const res = audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+                        if (res && typeof res.then === 'function') {
+                            res.then(resolve).catch(reject);
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+            }
+
             async function loadIceSound() {
                 if (!iceBuffer && !iceLoading) {
                     iceLoading = true;
@@ -2036,7 +2062,7 @@
                         if (c) {
                             const resp = await fetch(getAssetUrl('ice_crack'));
                             const arrayBuffer = await resp.arrayBuffer();
-                            iceBuffer = await c.decodeAudioData(arrayBuffer);
+                            iceBuffer = await decodeAudioDataSafe(c, arrayBuffer);
                         }
                     } catch (e) {
                         console.error('Error loading ice crack sound 1:', e);
@@ -2051,7 +2077,7 @@
                         if (c) {
                             const resp = await fetch(getAssetUrl('ice_crack_2'));
                             const arrayBuffer = await resp.arrayBuffer();
-                            iceBuffer2 = await c.decodeAudioData(arrayBuffer);
+                            iceBuffer2 = await decodeAudioDataSafe(c, arrayBuffer);
                         }
                     } catch (e) {
                         console.error('Error loading ice crack sound 2:', e);
@@ -2077,7 +2103,7 @@
                             try {
                                 const resp = await fetch(getAssetUrl(id));
                                 const arrayBuffer = await resp.arrayBuffer();
-                                metalThudBuffers[i] = await c.decodeAudioData(arrayBuffer);
+                                metalThudBuffers[i] = await decodeAudioDataSafe(c, arrayBuffer);
                             } catch (e) {
                                 console.error('Error loading ' + id + ':', e);
                             }
@@ -2144,7 +2170,7 @@
                     if (c) {
                         const resp = await fetch(getAssetUrl('hammer_strike'));
                         const arrayBuffer = await resp.arrayBuffer();
-                        hammerBuffer = await c.decodeAudioData(arrayBuffer);
+                        hammerBuffer = await decodeAudioDataSafe(c, arrayBuffer);
                     }
                 } catch (e) {
                     console.error('Error loading hammer sound:', e);
@@ -2161,7 +2187,7 @@
                     if (c) {
                         const resp = await fetch(getAssetUrl('soft_bounce'));
                         const arrayBuffer = await resp.arrayBuffer();
-                        softBounceBuffer = await c.decodeAudioData(arrayBuffer);
+                        softBounceBuffer = await decodeAudioDataSafe(c, arrayBuffer);
                     }
                 } catch (e) {
                     console.error('Error loading soft bounce sound:', e);
@@ -2178,7 +2204,7 @@
                     if (c) {
                         const resp = await fetch(getAssetUrl('archaeological_bgm'));
                         const arrayBuffer = await resp.arrayBuffer();
-                        musicBuffer = await c.decodeAudioData(arrayBuffer);
+                        musicBuffer = await decodeAudioDataSafe(c, arrayBuffer);
                         if (musicRequested) {
                             startMusic();
                         }
@@ -2571,7 +2597,16 @@
                 }
             }
 
-            function resumeFromVisibility() {
+    
+        // Auto-resume suspended AudioContext on window focus
+        window.addEventListener('focus', () => {
+            const c = ac(false);
+            if (c && (c.state === 'suspended' || c.state === 'interrupted')) {
+                c.resume().catch(() => {});
+            }
+        });
+
+        function resumeFromVisibility() {
                 const c = window._cubeAudioCtx;
                 if (!visibilityAudioSuspended || !c) return;
                 visibilityAudioSuspended = false;
@@ -2907,17 +2942,24 @@
                 const aspect = w / h;
                 camera.aspect = aspect;
 
-                // Smoothly ramp FOV boost as aspect ratio narrows below 4:3 (1.333) down to 1.0 (square)
-                // Fitted to BASE_FOV (42°): ramps from +0° boost at 4:3+ up to +5° boost at 1:1 square
-                const sqT = THREE.MathUtils.clamp((1.333 - aspect) / 0.333, 0, 1);
-                const fovBoost = THREE.MathUtils.lerp(0, 5, sqT);
+                const PORTRAIT_REF_FOV = 47.0; // preserves exact 75.4° on 9:16 and 86.6° on 9:19.5
+                const SQUARE_FOV = 58.0;       // clean number: wider square zoom out
+                const LANDSCAPE_FOV = 56.0;    // clean number: wider landscape zoom out
 
-                if (aspect < 1) {
-                    const halfFovRad = THREE.MathUtils.degToRad((BASE_FOV + fovBoost) * 0.5);
+                if (aspect < 1.0) {
+                    // Smoothly blend reference angle from portrait (47°) to square (54°)
+                    const pT = THREE.MathUtils.clamp((aspect - 0.5625) / (1.0 - 0.5625), 0, 1);
+                    const smoothPT = pT * pT * (3 - 2 * pT);
+                    const refFov = THREE.MathUtils.lerp(PORTRAIT_REF_FOV, SQUARE_FOV, smoothPT);
+
+                    const halfFovRad = THREE.MathUtils.degToRad(refFov * 0.5);
                     const halfHFovRad = Math.atan(Math.tan(halfFovRad) / aspect);
                     camera.fov = THREE.MathUtils.radToDeg(halfHFovRad * 2);
                 } else {
-                    camera.fov = BASE_FOV + fovBoost;
+                    // Smoothly blend from square (54°) to landscape (52°)
+                    const lT = THREE.MathUtils.clamp((aspect - 1.0) / 0.333, 0, 1);
+                    const smoothLT = lT * lT * (3 - 2 * lT);
+                    camera.fov = THREE.MathUtils.lerp(SQUARE_FOV, LANDSCAPE_FOV, smoothLT);
                 }
                 camera.updateProjectionMatrix();
                 dirty = true;
@@ -3434,6 +3476,10 @@ uniform float uDim;
             // Tool name popup: floats above the tool bar, horizontally centered on screen.
             const toolToast = document.getElementById('tool-toast');
             let toolToastTimer = 0;
+            let unlockTipTimer = null;
+            const newToolTip = document.getElementById('new-tool-tooltip');
+            const newToolTipBomb = document.getElementById('new-tool-tooltip-bomb');
+
             function showToolToast(key) {
                 if (!toolToast) return;
                 toolToast.textContent = window._t ? window._t(key) : key;
@@ -3454,6 +3500,8 @@ uniform float uDim;
                 };
                 scanBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
+                    if (newToolTip) newToolTip.classList.remove('show');
+                    if (unlockTipTimer) { clearTimeout(unlockTipTimer); unlockTipTimer = null; }
                     currentTool = 'scan';
                     refreshToolUI();
                     bus('vfx:toast', 'lensToolName');
@@ -3462,6 +3510,8 @@ uniform float uDim;
             if (bombBtn) {
                 bombBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
+                    if (newToolTipBomb) newToolTipBomb.classList.remove('show');
+                    if (unlockTipTimer) { clearTimeout(unlockTipTimer); unlockTipTimer = null; }
                     if (bombUsed) { bus('vfx:toast', 'bombSpent'); return; } // one charge per level
                     currentTool = 'bomb';
                     refreshToolUI();
@@ -4908,20 +4958,19 @@ uniform float uDim;
 
                 // Show "NEW TOOL!" above whichever tool this level unlocks:
                 // level 2 (index 1) -> resonance lens, level 3 (index 2) -> explosive charge.
-                const newToolTip = document.getElementById('new-tool-tooltip');
-                const newToolTipBomb = document.getElementById('new-tool-tooltip-bomb');
+                // Lasts 5 seconds or until the player clicks the new tool button.
+                if (unlockTipTimer) { clearTimeout(unlockTipTimer); unlockTipTimer = null; }
                 if (newToolTip) newToolTip.classList.remove('show');
                 if (newToolTipBomb) newToolTipBomb.classList.remove('show');
+
                 const unlockTip = level === 1 ? newToolTip : (level === 2 ? newToolTipBomb : null);
                 if (unlockTip) {
-                    setTimeout(() => {
+                    unlockTipTimer = setTimeout(() => {
                         unlockTip.classList.add('show');
-                        // Hide it on the next tap anywhere
-                        const hideTip = () => {
+                        unlockTipTimer = setTimeout(() => {
                             unlockTip.classList.remove('show');
-                            document.removeEventListener('pointerdown', hideTip);
-                        };
-                        document.addEventListener('pointerdown', hideTip);
+                            unlockTipTimer = null;
+                        }, 5000);
                     }, 1000);
                 }
                 shape = CubeCrackerFracture.shapes[lvl.shape](HALF * (lvl.sizeMul || 1));
@@ -7312,7 +7361,7 @@ uniform float uDim;
                     _collectPos.addScaledVector(_collectUp, arcVal * 0.42);
                     c.t.group.position.copy(_collectPos);
 
-                    c.sparkT = (c.sparkT || 0) + scaledDt;
+                    c.sparkT = (c.sparkT || 0) + dt;
                     while (c.sparkT >= 0.038) {
                         spawnSparkle(c.t.group.position, c.t.sprite.material.color);
                         c.sparkT -= 0.038;
@@ -8171,6 +8220,21 @@ uniform float uDim;
                     dirty = false;
                 }
             }
+
+
+            // Reset input state on blur or tab switch to prevent stuck dragging/striking
+            const handleInputBlur = () => {
+                pointerDown = false;
+                dragTouchId = null;
+                currentPinchDist = 0;
+                spinX = 0;
+                spinY = 0;
+                if (window.CubeCrackerResetInput) window.CubeCrackerResetInput();
+            };
+            window.addEventListener('blur', handleInputBlur);
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) handleInputBlur();
+            });
 
             // ---------- misc wiring (Container-Scoped ResizeObserver + Fallback) ----------
             if (window.ResizeObserver && canvasHost) {
