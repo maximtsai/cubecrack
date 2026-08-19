@@ -2578,7 +2578,36 @@
                 if (c.state === 'suspended') c.resume().catch(() => { });
             }
 
-            window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol };
+    
+        // Message Bus integration for Audio
+        if (window.Game && window.Game.bus) {
+            const bus = window.Game.bus;
+            bus.subscribe('audio:play', (data) => {
+                if (!data) return;
+                const sfx = typeof data === 'string' ? data : data.sfx;
+                const arg = data && data.arg;
+                if (sfx === 'thunk') thunk(arg);
+                else if (sfx === 'bounce') bounce();
+                else if (sfx === 'shatter') shatter();
+                else if (sfx === 'metalThud') metalThud();
+                else if (sfx === 'boom') boom();
+                else if (sfx === 'reveal') reveal();
+                else if (sfx === 'chime') chime(arg !== undefined ? arg : 0);
+                else if (sfx === 'win') win();
+                else if (sfx === 'startOverJingle') startOverJingle();
+            });
+            bus.subscribe('audio:music:start', () => startMusic());
+            bus.subscribe('audio:music:stop', () => stopMusic());
+            bus.subscribe('audio:warm', () => warm());
+            bus.subscribe('audio:volume:master', (data) => setMasterVol(data && data.volume !== undefined ? data.volume : data));
+            bus.subscribe('audio:volume:music', (data) => setMusicVol(data && data.volume !== undefined ? data.volume : data));
+            bus.subscribe('audio:visibility', (data) => {
+                if (data && data.hidden) pauseForVisibility();
+                else resumeFromVisibility();
+            });
+        }
+
+        window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol };
         })();
 
     
@@ -3334,7 +3363,40 @@ uniform float uDim;
                 again: document.getElementById('again'),
             };
 
-            function updateLevelStrikeCounter(pop = false) {
+
+            // Helper for publishing to Message Bus
+            const bus = (topic, ...args) => {
+                if (window.Game && window.Game.bus) {
+                    window.Game.bus.publish(topic, ...args);
+                }
+            };
+
+            // Register core gameplay & UI subscriptions
+            if (window.Game && window.Game.bus) {
+                const b = window.Game.bus;
+                b.subscribe('game:strike', (data) => updateLevelStrikeCounter(data && data.pop));
+                b.subscribe('vfx:vignette', (data) => triggerVignetteFlash(data && data.colorHex));
+                b.subscribe('vfx:toast', (data) => showToolToast(typeof data === 'string' ? data : (data && data.key)));
+                b.subscribe('game:hint', (data) => {
+                    if (data) setHint(data.key, data.repl, data.immediate);
+                });
+                b.subscribe('game:tool:change', () => refreshToolUI());
+                b.subscribe('game:ring:found', () => {
+                    const badge = document.getElementById('ring-badge');
+                    if (badge) badge.classList.add('found');
+                });
+                b.subscribe('vfx:shake', (data) => {
+                    const amp = (data && data.amp !== undefined) ? data.amp : 0.16;
+                    if (window.screenShakeEnabled !== false) {
+                        shake = Math.max(shake, amp * MOTION);
+                    }
+                    if (window.hapticsEnabled !== false && navigator.vibrate) {
+                        try { navigator.vibrate(14); } catch (e) {}
+                    }
+                });
+            }
+
+                        function updateLevelStrikeCounter(pop = false) {
                 const counter = document.getElementById('level-strikes-count');
                 if (!counter) return;
                 counter.textContent = strikes;
@@ -3388,19 +3450,19 @@ uniform float uDim;
                     e.preventDefault(); e.stopPropagation();
                     currentTool = 'hammer';
                     refreshToolUI();
-                    showToolToast('hammerToolName');
+                    bus('vfx:toast', 'hammerToolName');
                 };
                 scanBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
                     currentTool = 'scan';
                     refreshToolUI();
-                    showToolToast('lensToolName');
+                    bus('vfx:toast', 'lensToolName');
                 };
             }
             if (bombBtn) {
                 bombBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    if (bombUsed) { showToolToast('bombSpent'); return; } // one charge per level
+                    if (bombUsed) { bus('vfx:toast', 'bombSpent'); return; } // one charge per level
                     currentTool = 'bomb';
                     refreshToolUI();
                     showToolToast('bombToolName');
@@ -4137,7 +4199,7 @@ uniform float uDim;
                 r.group.position.copy(wp);
                 scene.add(r.group);
                 ringFx = { t: 0, from: wp.clone(), to: ringBadgeWorldTarget(), sparkT: 0 };
-                CubeCrackerAudio.reveal();
+                bus('audio:play', { sfx: 'reveal' });
                 CubeCrackerAudio.chime(1);
                 spawnSparkleBurst(wp, new THREE.Color(0xffe6a8), 34);
                 spawnJuiceText('GOLD RING BONUS!!!', wp, '#ffd166', '44px');
@@ -4187,8 +4249,7 @@ uniform float uDim;
                 if (k >= 1) {
                     scene.remove(r.group);
                     ringFx = null;
-                    const badge = document.getElementById('ring-badge');
-                    if (badge) badge.classList.add('found'); // pops as the ring lands
+                    bus('game:ring:found');
                 }
             }
 
@@ -4826,7 +4887,7 @@ uniform float uDim;
                 if (level === 0) {
                     window.hitsPerLevel = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
                     if (interacted) {
-                        CubeCrackerAudio.startOverJingle();
+                        bus('audio:play', { sfx: 'startOverJingle' });
                     }
                 }
                 hud.slots.forEach((s) => {
@@ -5717,8 +5778,8 @@ uniform float uDim;
                 bombUsed = true;
                 strikes++;
                 window.strikes = strikes;
-                updateLevelStrikeCounter(true); // the charge is a strike too — keep the HUD in sync
-                if (strikes === 1) CubeCrackerAudio.startMusic();
+                bus('game:strike', { pop: true }); // the charge is a strike too — keep the HUD in sync
+                if (strikes === 1) bus('audio:music:start');
                 if (window.hapticsEnabled !== false && navigator.vibrate) {
                     try { navigator.vibrate([40, 30, 90]); } catch (e) { }
                 }
@@ -7224,7 +7285,7 @@ uniform float uDim;
                 const idx = treasures.indexOf(t);
                 const to = slotWorldTarget(idx);
                 collecting.push({ t, from: wp.clone(), to, k: 0, idx });
-                CubeCrackerAudio.chime(idx);
+                bus('audio:play', { sfx: 'chime', arg: idx });
             }
 
             const _collectPos = new V3();
@@ -7357,7 +7418,7 @@ uniform float uDim;
                     }
 
                     hud.overlay.classList.add('show');
-                    CubeCrackerAudio.win();
+                    bus('audio:play', { sfx: 'win' });
                 }, 650);
             }
 
