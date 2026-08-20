@@ -1,5 +1,21 @@
 /* Gem Cracker - styles extracted from index.html */
 
+/* Cinzel, self-hosted rather than fetched from Google's CDN: the game has to be
+   self-contained, and a web font is a render-blocking round trip to a third party
+   on every cold load.
+
+   One file covers every weight the UI uses. This is a genuine variable font with a
+   wght axis spanning 400-900, so declaring that range lets 500, 600 and 700 all
+   come out of the same download — the CDN request it replaces only fetched the 500
+   and 700 instances, which left the one 600 rule snapping to a neighbour. */
+@font-face {
+    font-family: 'Cinzel';
+    src: url('font/Cinzel-VariableFont_wght.ttf') format('truetype');
+    font-weight: 400 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     /* One design-pixel unit (--u): affine function of min canvas dimension:
                --u = (6px + 1.0 * min(w,h)/100) / 16
