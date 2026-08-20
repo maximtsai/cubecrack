@@ -7,9 +7,13 @@ window.masterVolume = 1.0;
 window.musicVolume = 0.5;
 window.hapticsEnabled = true;
 
-// Detect player's language, falling back to English if unsupported
-const detectPlayerLanguage = () => {
-    const playerLang = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+// Map a BCP-47 tag from the host to one of our locales, falling back to English.
+// The tag is supplied by the portal bridge (GameSDK.getLanguage()) — reading the
+// browser's own locale preference is forbidden on YouTube Playables and the
+// certification scan greps the shipped bundle as text, so no such call may exist
+// here even on a path Playables never runs.
+const normalizeLocale = (tag) => {
+    const playerLang = String(tag || 'en').toLowerCase();
     if (playerLang.startsWith('zh')) {
         // Distinguish Traditional Chinese from Simplified Chinese
         if (playerLang.includes('hant') || playerLang.includes('tw') || playerLang.includes('hk') || playerLang.includes('mo')) {
@@ -22,7 +26,8 @@ const detectPlayerLanguage = () => {
     return supported.includes(primary) ? primary : 'en';
 };
 
-window.currentLang = detectPlayerLanguage();
+// English until the host tells us otherwise; bootPlatform() resolves the real one.
+window.currentLang = 'en';
 window.screenShakeEnabled = true;
 // null = not played in this run. It has to be distinguishable from 0: a level left
 // at 0 rendered as "0 hits" with no star rating, which reads as a flawless clear
@@ -30,45 +35,96 @@ window.screenShakeEnabled = true;
 window.hitsPerLevel = Array(12).fill(null);
 window.bestScores = Array(12).fill(null);
 
-// ---------- player settings persistence ----------
-// Everything the options panel can change lives in one record. The panel used to
-// write the shake/haptics flags to their own keys that nothing ever read back, so
-// every setting silently reset on reload; volume and language weren't saved at all.
-const SETTINGS_KEY = 'cube_cracker_settings';
+// ---------- saved state ----------
+// One record holds everything that outlives a session: per-level records, the
+// secret rings, and the options panel. It goes through the portal bridge rather
+// than any browser-side persistence mechanism — YouTube Playables forbids those
+// outright, and the certification scan reads the bundle as text, so no such call
+// may appear here at all.
+//
+// Writes are debounced: the volume sliders fire on every input event, and each
+// one would otherwise be a round trip to the platform. A host pause flushes
+// immediately (see bootPlatform), which is the case that actually matters — it
+// is the last moment before the player is gone.
+const SAVE_VERSION = 1;
 const SETTINGS_LANGS = ['en', 'es', 'fr', 'zh', 'zh-hant', 'ar', 'hi', 'ja', 'ru'];
+const SAVE_DEBOUNCE_MS = 400;
+let saveTimer = 0;
+let saveLoaded = false;   // don't write before the load lands and clobber it
 
-window.saveGameSettings = function () {
-    try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+function currentSaveRecord() {
+    return {
+        v: SAVE_VERSION,
+        bestScores: window.bestScores,
+        ringsFound: window.ringsFound,
+        settings: {
             masterVolume: window.masterVolume,
             musicVolume: window.musicVolume,
             screenShakeEnabled: window.screenShakeEnabled !== false,
             hapticsEnabled: window.hapticsEnabled !== false,
             lang: window.currentLang,
-        }));
-    } catch (e) { /* private mode / quota: settings just won't persist */ }
+        },
+    };
+}
+
+window.persistGameState = function (opts) {
+    const immediate = !!(opts && opts.immediate);
+    // A write issued before the initial load would be overwritten by that load's
+    // merge a moment later, so hold everything until it has landed.
+    if (!saveLoaded && !immediate) return;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    const flush = () => {
+        saveTimer = 0;
+        if (!window.GameSDK) return;
+        window.GameSDK.saveJSON(currentSaveRecord());
+    };
+    if (immediate) flush();
+    else saveTimer = setTimeout(flush, SAVE_DEBOUNCE_MS);
 };
 
-(function loadGameSettings() {
-    const vol = (v, fallback) => (typeof v === 'number' && v >= 0 && v <= 1 ? v : fallback);
-    let s = null;
-    try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch (e) { s = null; }
-    if (s && typeof s === 'object') {
-        window.masterVolume = vol(s.masterVolume, window.masterVolume);
-        window.musicVolume = vol(s.musicVolume, window.musicVolume);
-        if (typeof s.screenShakeEnabled === 'boolean') window.screenShakeEnabled = s.screenShakeEnabled;
-        if (typeof s.hapticsEnabled === 'boolean') window.hapticsEnabled = s.hapticsEnabled;
-        if (SETTINGS_LANGS.indexOf(s.lang) !== -1) window.currentLang = s.lang;
-        return;
+// Kept as its own name because the options panel calls it from five places.
+window.saveGameSettings = function () { window.persistGameState(); };
+
+// Merge, never overwrite: the player may already have set a record or found a
+// ring in the seconds before the platform answered, and a wholesale swap would
+// throw that away.
+window.applySavedState = function (state) {
+    saveLoaded = true;
+    if (!state || typeof state !== 'object') return;
+
+    if (Array.isArray(state.bestScores)) {
+        for (let i = 0; i < state.bestScores.length && i < window.bestScores.length; i++) {
+            const saved = state.bestScores[i];
+            if (saved != null && (window.bestScores[i] == null || saved < window.bestScores[i])) {
+                window.bestScores[i] = saved;
+            }
+        }
     }
-    // Migrate the two legacy write-only keys from before this record existed.
-    try {
-        const shake = localStorage.getItem('cube_cracker_screen_shake');
-        const haptics = localStorage.getItem('cube_cracker_haptics');
-        if (shake !== null) window.screenShakeEnabled = shake !== 'false';
-        if (haptics !== null) window.hapticsEnabled = haptics !== 'false';
-    } catch (e) { /* nothing to migrate */ }
-})();
+    if (Array.isArray(state.ringsFound)) {
+        for (let i = 0; i < state.ringsFound.length && i < window.ringsFound.length; i++) {
+            if (state.ringsFound[i]) window.ringsFound[i] = true;
+        }
+    }
+
+    const st = state.settings;
+    if (st && typeof st === 'object') {
+        const vol = (v, fallback) => (typeof v === 'number' && v >= 0 && v <= 1 ? v : fallback);
+        window.masterVolume = vol(st.masterVolume, window.masterVolume);
+        window.musicVolume = vol(st.musicVolume, window.musicVolume);
+        if (typeof st.screenShakeEnabled === 'boolean') window.screenShakeEnabled = st.screenShakeEnabled;
+        if (typeof st.hapticsEnabled === 'boolean') window.hapticsEnabled = st.hapticsEnabled;
+        if (SETTINGS_LANGS.indexOf(st.lang) !== -1) window.currentLang = st.lang;
+    }
+
+    if (window.CubeCrackerAudio) {
+        window.CubeCrackerAudio.setMasterVol(window.masterVolume);
+        window.CubeCrackerAudio.setMusicVol(window.musicVolume);
+    }
+    if (window.refreshOptionsUI) window.refreshOptionsUI();
+    if (window.renderLevelList) window.renderLevelList();
+    if (window.applyTranslations) window.applyTranslations();
+};
 
 window.TRANSLATIONS = {
     en: {
@@ -1303,8 +1359,6 @@ const initOptions = () => {
     const shakeStatus = newOverlay.querySelector('#shake-status');
 
     if (newShakeToggle) {
-        newShakeToggle.checked = window.screenShakeEnabled !== false;
-        if (shakeStatus) shakeStatus.textContent = newShakeToggle.checked ? window._t('onText') : window._t('offText');
         newShakeToggle.addEventListener('change', (e) => {
             window.screenShakeEnabled = e.target.checked;
             window.saveGameSettings();
@@ -1323,8 +1377,6 @@ const initOptions = () => {
     }
 
     if (newHapticsToggle) {
-        newHapticsToggle.checked = window.hapticsEnabled !== false;
-        if (hapticsStatus) hapticsStatus.textContent = newHapticsToggle.checked ? window._t('onText') : window._t('offText');
         newHapticsToggle.addEventListener('change', (e) => {
             window.hapticsEnabled = e.target.checked;
             window.saveGameSettings();
@@ -1332,43 +1384,29 @@ const initOptions = () => {
         });
     }
 
-    // Initialize sliders and select from defaults
-    newSfxSlider.value = Math.round(window.masterVolume * 100);
-    sfxVal.textContent = newSfxSlider.value + '%';
-    newMusicSlider.value = Math.round(window.musicVolume * 100);
-    musicVal.textContent = newMusicSlider.value + '%';
-    newLangSelect.value = window.currentLang;
+    // Paint every control from the current globals. Exposed because the saved
+    // record arrives asynchronously from the platform, well after this panel is
+    // built — without a repaint the sliders would sit at their defaults while the
+    // game itself ran on the restored values.
+    window.refreshOptionsUI = () => {
+        newSfxSlider.value = Math.round(window.masterVolume * 100);
+        sfxVal.textContent = newSfxSlider.value + '%';
+        newMusicSlider.value = Math.round(window.musicVolume * 100);
+        musicVal.textContent = newMusicSlider.value + '%';
+        newLangSelect.value = window.currentLang;
+        if (newShakeToggle) {
+            newShakeToggle.checked = window.screenShakeEnabled !== false;
+            if (shakeStatus) shakeStatus.textContent = newShakeToggle.checked ? window._t('onText') : window._t('offText');
+        }
+        if (newHapticsToggle) {
+            newHapticsToggle.checked = window.hapticsEnabled !== false;
+            if (hapticsStatus) hapticsStatus.textContent = newHapticsToggle.checked ? window._t('onText') : window._t('offText');
+        }
+    };
+    window.refreshOptionsUI();
 };
 
 window.ringsFound = Array(12).fill(false);
-
-async function loadBestScores() {
-    try {
-        const saved = localStorage.getItem('cube_cracker_game_state');
-        if (saved) {
-            const state = JSON.parse(saved);
-            // Merge rather than overwrite: the game may already have recorded a newer
-            // best (or a just-found ring) in memory before this async load lands, and a
-            // wholesale swap used to clobber that progress.
-            if (state && Array.isArray(state.bestScores)) {
-                for (let i = 0; i < state.bestScores.length && i < window.bestScores.length; i++) {
-                    const savedScore = state.bestScores[i];
-                    if (savedScore != null && (window.bestScores[i] == null || savedScore < window.bestScores[i])) {
-                        window.bestScores[i] = savedScore;
-                    }
-                }
-            }
-            if (state && Array.isArray(state.ringsFound)) {
-                for (let i = 0; i < state.ringsFound.length && i < window.ringsFound.length; i++) {
-                    if (state.ringsFound[i]) window.ringsFound[i] = true;
-                }
-            }
-            if (window.renderLevelList) window.renderLevelList();
-        }
-    } catch (e) {
-        console.warn('Failed to load best scores', e);
-    }
-}
 
 // Load the authored per-level data file (star-rank thresholds live in `gameConfig`).
 // Seed with built-in defaults so star ranks are available immediately; the fetch
@@ -1406,11 +1444,10 @@ fetch('config')
 window.validateTranslations();
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { initOptions(); initLevelSelect(); loadBestScores(); });
+    document.addEventListener('DOMContentLoaded', () => { initOptions(); initLevelSelect(); });
 } else {
     initOptions();
     initLevelSelect();
-    loadBestScores();
 }
 
 
@@ -4332,13 +4369,7 @@ uniform float uDim;
         r.collected = true;
         ringFound = true;
         window.ringsFound[level] = true;
-        (async () => {
-            try {
-                localStorage.setItem('cube_cracker_game_state', JSON.stringify({ bestScores: window.bestScores, ringsFound: window.ringsFound }));
-            } catch (e) {
-                console.warn('Failed to save ring progress', e);
-            }
-        })();
+        window.persistGameState();
         const wp = new V3();
         r.group.getWorldPosition(wp);
         cubeGroup.remove(r.group);
@@ -7573,13 +7604,7 @@ uniform float uDim;
         if (window.bestScores && (window.bestScores[level] == null || strikes < window.bestScores[level])) {
             isNewBest = true;
             window.bestScores[level] = strikes;
-            (async () => {
-                try {
-                    localStorage.setItem('cube_cracker_game_state', JSON.stringify({ bestScores: window.bestScores, ringsFound: window.ringsFound }));
-                } catch (e) {
-                    console.warn('Failed to save best score', e);
-                }
-            })();
+            window.persistGameState();
             if (window.renderLevelList) window.renderLevelList();
         }
         if (window.applyTranslations) window.applyTranslations();
@@ -8428,9 +8453,6 @@ uniform float uDim;
         if (window.CubeCrackerResetInput) window.CubeCrackerResetInput();
     };
     window.addEventListener('blur', handleInputBlur);
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) handleInputBlur();
-    });
 
     // ---------- misc wiring (Container-Scoped ResizeObserver + Fallback) ----------
     if (window.ResizeObserver && canvasHost) {
@@ -8609,23 +8631,26 @@ uniform float uDim;
         window._cubeRafId = null;
     }
 
-    if (window._cubeVisChange) {
-        document.removeEventListener('visibilitychange', window._cubeVisChange);
-    }
-    window._cubeVisChange = () => {
-        if (document.hidden) {
-            if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
-                window.CubeCrackerAudio.pauseForVisibility();
-            }
-            stopLoop();
-        } else {
-            if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
-                window.CubeCrackerAudio.resumeFromVisibility();
-            }
-            startLoop();
+    // Backgrounding is the host's call, not something this game detects for
+    // itself: the portal bridge delivers it (see bootPlatform below). Don't burn
+    // CPU/GPU/battery while paused, and discard the elapsed time on resume so the
+    // physics doesn't jump by a huge dt.
+    function hostPause() {
+        handleInputBlur();
+        if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
+            window.CubeCrackerAudio.pauseForVisibility();
         }
-    };
-    document.addEventListener('visibilitychange', window._cubeVisChange);
+        stopLoop();
+        // Last chance to get progress out before the player is gone.
+        if (window.persistGameState) window.persistGameState({ immediate: true });
+    }
+
+    function hostResume() {
+        if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
+            window.CubeCrackerAudio.resumeFromVisibility();
+        }
+        startLoop();
+    }
 
     // WebGL context can be lost (GPU reset, tab backgrounded on mobile). Allow the
     // browser to restore it, then rebuild GPU resources and resume.
@@ -8672,6 +8697,51 @@ uniform float uDim;
                 setTimeout(() => loader.remove(), 650);
             }, wait);
         });
+    })();
+
+    // ---------- portal bridge ----------
+    // The game above boots synchronously so the first frame paints as early as
+    // possible; this attaches the portal to the already-running game once its SDK
+    // answers the handshake. Everything here is optional — a dead or absent portal
+    // leaves a fully playable game, it just doesn't persist or take host signals.
+    (async function bootPlatform() {
+        const sdk = window.GameSDK;
+        if (!sdk) return;
+
+        // Never let a slow platform call hold the loading UI up forever. init()
+        // already guarantees this for itself; the storage read does not.
+        const withTimeout = (p, ms, fallback) => Promise.race([
+            Promise.resolve(p).catch(() => fallback),
+            new Promise((res) => setTimeout(() => res(fallback), ms)),
+        ]);
+
+        await sdk.init();
+
+        // The first frame painted during the synchronous boot above, so this is
+        // already true by the time we get here. It MUST precede loadingStop().
+        sdk.firstFrameReady();
+
+        // Host lifecycle. Registered after init(), because the adapter ignores
+        // subscriptions taken before the handshake resolves.
+        sdk.onPause(hostPause);
+        sdk.onResume(hostResume);
+
+        // Saved records and options. applySavedState merges rather than replaces,
+        // so anything achieved in the seconds before this landed survives; calling
+        // it with null on failure still flips the gate that lets writes through.
+        const saved = await withTimeout(sdk.loadJSON(), 5000, null);
+        window.applySavedState(saved);
+
+        // Locale. An explicit choice the player saved outranks the host's, so only
+        // ask the platform when the record didn't carry one.
+        if (!(saved && saved.settings && saved.settings.lang)) {
+            const tag = await withTimeout(sdk.getLanguage(), 3000, 'en');
+            window.setGameLanguage(normalizeLocale(tag));
+        }
+
+        // Genuinely interactive AND showing the player's real data: dismiss the
+        // platform's loading UI.
+        sdk.loadingStop();
     })();
 
     // debug hook (harmless in production)

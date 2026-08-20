@@ -181,6 +181,21 @@
 
     <div id="tweaks-root"></div>
 
+    <!-- YouTube Playables vendor SDK. Parser-blocking and FIRST, exactly as the
+         platform docs specify, so window.ytgame exists before the adapter runs. -->
+    <script src="https://www.youtube.com/game_api/v1"></script>
+
+    <!-- Portal bridge: core, then EXACTLY ONE adapter. Shipping a second adapter
+         fails Playables certification even if it could never run — the review
+         greps the whole bundle as text. -->
+    <script src="platform/sdk-core.js"></script>
+    <script src="platform/platform-youtube.js"></script>
+    <script>
+        // Must run before the first save or load so storage lands in the right
+        // namespace.
+        window.GameSDK.configure({ gameKey: 'gem-cracker' });
+    </script>
+
     <script src="scripts/three.min.js"></script>
 
     <script src="scripts/messagebus.js"></script>
