@@ -136,7 +136,7 @@ h1 {
     transform: translateY(calc(var(--u) * -5));
 }
 
-/* Live per-level strike counter: centered below the title and relic slots. */
+/* Live per-level strike counter: centered below the title and gem slots. */
 #level-strikes {
     position: relative;
     top: calc(var(--u) * -5);
@@ -216,10 +216,10 @@ h1 {
     --slot-glow: rgba(200, 155, 255, 0.75);
 }
 
-/* Secret gold-ring badge: positioned beside the three relic slots rather than
+/* Secret gold-ring badge: positioned beside the three gem slots rather than
            participating in their flex layout. It still has a stable, measurable location
            while hidden, so the collected ring can fly precisely into it without creating
-           an empty fourth-slot gap or shifting the relic slots. */
+           an empty fourth-slot gap or shifting the gem slots. */
 #ring-badge {
     position: absolute;
     top: calc(var(--u) * -1);
@@ -298,7 +298,7 @@ h1 {
     animation: slotVictoryBounce 0.4s cubic-bezier(0.25, 1.5, 0.5, 1) both !important;
 }
 
-/* vibrant pop when a relic drops into its slot */
+/* vibrant pop when a gem drops into its slot */
 @keyframes slotPop {
     0% {
         transform: rotate(45deg) scale(1);
@@ -708,15 +708,16 @@ body.has-overlay #options-btn {
 }
 
 #winCard {
-    background: linear-gradient(135deg, #241e18 0%, #15120e 100%);
+    background: linear-gradient(135deg, #261f19 0%, #15120e 100%);
     border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.40);
     border-radius: calc(var(--u) * 16);
-    padding: calc(var(--u) * 28) calc(var(--u) * 32);
+    padding: calc(var(--u) * 32) calc(var(--u) * 32);
     width: 90%;
     max-width: calc(var(--u) * 440);
-    box-shadow: 0 calc(var(--u) * 16) calc(var(--u) * 48) rgba(0, 0, 0, 0.85);
+    box-shadow: 0 calc(var(--u) * 18) calc(var(--u) * 52) rgba(0, 0, 0, 0.88);
     transform: scale(0.94);
     transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    gap: calc(var(--u) * 16);
 }
 
 #overlay.show #winCard {
@@ -724,12 +725,13 @@ body.has-overlay #options-btn {
 }
 
 .card h2 {
-    font-size: calc(var(--u) * 30);
+    font-size: calc(var(--u) * 32);
     font-weight: 700;
-    letter-spacing: 0.28em;
-    text-indent: 0.28em;
+    letter-spacing: 0.26em;
+    text-indent: 0.26em;
     color: var(--gold);
     margin: 0;
+    line-height: 1.25;
 }
 
 .card p {
@@ -743,15 +745,24 @@ body.has-overlay #options-btn {
     margin: 0;
 }
 
-/* End-of-level star ranking (bronze / silver / gold). Tier colours are pushed onto
-           the row as CSS custom properties by paintWinRank(). */
+#winDesc #strikeCount {
+    color: var(--gold);
+    font-weight: 700;
+    font-family: Cinzel, serif;
+    font-size: calc(var(--u) * 25);
+}
+
+/* End-of-level star ranking (bronze / silver / gold). */
 .win-stars {
+    position: relative;
     display: flex;
-    gap: calc(var(--u) * 24);
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--u) * 26);
     line-height: 1;
-    font-size: calc(var(--u) * 64);
-    min-height: calc(var(--u) * 70);
-    margin: calc(var(--u) * 4) 0;
+    font-size: calc(var(--u) * 62);
+    min-height: calc(var(--u) * 78);
+    margin: calc(var(--u) * 6) 0;
 }
 
 .win-star {
@@ -762,19 +773,34 @@ body.has-overlay #options-btn {
     will-change: transform, opacity;
 }
 
-.win-star.earned {
-    color: var(--rank-color, #e8c98a);
-    text-shadow: 0 0 calc(var(--u) * 16) var(--rank-glow, rgba(232, 201, 138, 0.75)),
-        0 0 calc(var(--u) * 32) var(--rank-glow, rgba(232, 201, 138, 0.5));
-    animation: winStarPop 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
 .win-star:nth-child(2) {
-    animation-delay: 0.24s;
+    font-size: calc(var(--u) * 74);
+    transform: translateY(calc(var(--u) * -4)) scale(0.4);
+    animation-delay: 0.22s;
 }
 
 .win-star:nth-child(3) {
-    animation-delay: 0.48s;
+    animation-delay: 0.44s;
+}
+
+.win-star.earned {
+    color: var(--rank-color, #e8c98a);
+    text-shadow: 0 0 calc(var(--u) * 16) var(--rank-glow, rgba(232, 201, 138, 0.75)),
+        0 0 calc(var(--u) * 36) var(--rank-glow, rgba(232, 201, 138, 0.5));
+    animation: winStarPop 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.win-star:nth-child(1).earned {
+    animation-delay: 0.15s;
+}
+
+.win-star:nth-child(2).earned {
+    animation: winStarPopCenter 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: 0.50s;
+}
+
+.win-star:nth-child(3).earned {
+    animation-delay: 0.85s;
 }
 
 @keyframes winStarIn {
@@ -824,6 +850,36 @@ body.has-overlay #options-btn {
     }
 }
 
+@keyframes winStarPopCenter {
+    0% {
+        opacity: 0;
+        transform: translateY(calc(var(--u) * -4)) scale(0) rotate(-35deg);
+        filter: brightness(2.2);
+    }
+
+    42% {
+        opacity: 1;
+        transform: translateY(calc(var(--u) * -4)) scale(1.78) rotate(10deg);
+        filter: brightness(1.6);
+    }
+
+    68% {
+        transform: translateY(calc(var(--u) * -4)) scale(0.92) rotate(-3deg);
+        filter: brightness(1.1);
+    }
+
+    84% {
+        transform: translateY(calc(var(--u) * -4)) scale(1.12) rotate(1deg);
+        filter: brightness(1.0);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(calc(var(--u) * -4)) scale(1.06) rotate(0deg);
+        filter: brightness(1);
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
     .win-star,
@@ -837,33 +893,39 @@ body.has-overlay #options-btn {
 #winRank {
     font-family: Cinzel, serif;
     font-weight: 700;
-    font-size: calc(var(--u) * 24);
+    font-size: calc(var(--u) * 26);
     letter-spacing: 0.22em;
     text-indent: 0.22em;
-    min-height: calc(var(--u) * 28);
+    min-height: calc(var(--u) * 30);
     text-transform: uppercase;
 }
 
 #winBest {
     font-family: Cinzel, serif;
-    font-size: calc(var(--u) * 20);
-    letter-spacing: 0.12em;
+    font-size: calc(var(--u) * 21);
+    letter-spacing: 0.14em;
     color: var(--dim);
-    font-weight: 500;
+    font-weight: 600;
     margin-top: calc(var(--u) * 2);
 }
 
 #winRing {
     font-family: Cinzel, serif;
-    font-size: calc(var(--u) * 20);
+    font-size: calc(var(--u) * 19);
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.16em;
+    text-indent: 0.16em;
     color: #ffd166;
-    background: rgba(255, 209, 102, 0.12);
-    border: calc(var(--u) * 1.5) solid rgba(255, 209, 102, 0.5);
-    border-radius: calc(var(--u) * 20);
-    padding: calc(var(--u) * 4) calc(var(--u) * 16);
-    display: inline-block;
+    background: linear-gradient(180deg, rgba(255, 209, 102, 0.18) 0%, rgba(255, 209, 102, 0.08) 100%);
+    border: calc(var(--u) * 1.5) solid rgba(255, 209, 102, 0.65);
+    border-radius: calc(var(--u) * 24);
+    padding: calc(var(--u) * 8) calc(var(--u) * 22);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 16) rgba(0, 0, 0, 0.4), inset 0 0 calc(var(--u) * 10) rgba(255, 209, 102, 0.12);
+    margin: calc(var(--u) * 4) 0;
 }
 
 #winRing:empty {
@@ -871,29 +933,30 @@ body.has-overlay #options-btn {
 }
 
 .card button {
-    margin-top: calc(var(--u) * 10);
+    margin-top: calc(var(--u) * 12);
     font-family: Cinzel, serif;
     font-size: calc(var(--u) * 26);
     font-weight: 700;
-    letter-spacing: 0.2em;
-    text-indent: 0.2em;
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
     color: #14110e;
-    background: linear-gradient(180deg, #f3d89d 0%, #d8b26e 100%);
+    background: linear-gradient(180deg, #f7dfa8 0%, #d8b26e 100%);
     border: none;
+    border-top: calc(var(--u) * 1) solid rgba(255, 255, 255, 0.45);
     padding: calc(var(--u) * 18) calc(var(--u) * 36);
     cursor: pointer;
-    min-height: calc(var(--u) * 64);
+    min-height: calc(var(--u) * 68);
     width: 100%;
     max-width: calc(var(--u) * 340);
-    border-radius: calc(var(--u) * 8);
-    box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 16) rgba(0, 0, 0, 0.4);
+    border-radius: calc(var(--u) * 10);
+    box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 18) rgba(0, 0, 0, 0.45);
     transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }
 
 .card button:hover {
     transform: translateY(calc(var(--u) * -2));
-    filter: brightness(1.06);
-    box-shadow: 0 calc(var(--u) * 8) calc(var(--u) * 24) rgba(232, 201, 138, 0.4);
+    filter: brightness(1.08);
+    box-shadow: 0 calc(var(--u) * 8) calc(var(--u) * 26) rgba(232, 201, 138, 0.45);
 }
 
 .card button:active {
@@ -1564,7 +1627,7 @@ body.intro-hide-ui #options-btn {
 /* SECRET RING text popup lasts 1s longer (2.4s) */
 .secret-ring-text {
     animation: secretRingTextAnim 2.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
-    font-size: calc(var(--u) * 44) !important;
+    font-size: calc(var(--u) * 30) !important;
 }
 
 @keyframes secretRingTextAnim {
@@ -1575,24 +1638,24 @@ body.intro-hide-ui #options-btn {
 
     10% {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1.75) rotate(var(--rot-mid));
+        transform: translate(-50%, -50%) scale(1.35) rotate(var(--rot-mid));
     }
 
     20% {
-        transform: translate(-50%, -50%) scale(1.15) rotate(var(--rot-mid));
+        transform: translate(-50%, -50%) scale(0.95) rotate(var(--rot-mid));
     }
 
     32% {
-        transform: translate(-50%, -50%) scale(1.45) rotate(var(--rot-mid));
+        transform: translate(-50%, -50%) scale(1.15) rotate(var(--rot-mid));
     }
 
     75% {
-        transform: translate(-50%, -50%) scale(1.25) rotate(var(--rot-mid));
+        transform: translate(-50%, -50%) scale(1.0) rotate(var(--rot-mid));
         opacity: 1;
     }
 
     100% {
-        transform: translate(-50%, calc(-50% - calc(var(--u) * 180))) scale(0.5) rotate(var(--rot-end));
+        transform: translate(-50%, calc(-50% - calc(var(--u) * 140))) scale(0.4) rotate(var(--rot-end));
         opacity: 0;
     }
 }
