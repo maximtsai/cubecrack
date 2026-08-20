@@ -32,7 +32,7 @@
                 loading: "Loading",
                 dragHint: "drag to rotate - tap to strike",
                 searchRelicsHint: "search for hidden gems",
-                relicGleams: "a gem gleams - tap it to claim",
+                relicGleams: "You found a gem!",
                 relicsRemain2: "two gems remain",
                 relicsRemain1: "one gem remains",
                 iceHint: "ice - cracks then shatters when struck twice",
@@ -46,7 +46,7 @@
                 wonPillarCracked: "PILLAR CRACKED",
                 wonPyramidCracked: "PYRAMID CRACKED",
                 wonHeartShattered: "HEART SHATTERED",
-                iceHeart: "ICE HEART",
+                iceHeart: "FROZEN HEART",
                 obsidianGeode: "OBSIDIAN GEODE",
                 wonGeodeCracked: "GEODE CRACKED",
                 obsidianHint: "obsidian - cracks, then splinters",
@@ -116,7 +116,7 @@
                 loading: "Cargando",
                 dragHint: "arrastra para girar - toca para golpear",
                 searchRelicsHint: "busca las gemas ocultas",
-                relicGleams: "una gema brilla - toca para recogerla",
+                relicGleams: "¡Has encontrado una gema!",
                 relicsRemain2: "quedan dos gemas",
                 relicsRemain1: "queda una gema",
                 iceHint: "hielo - se agrieta y luego se rompe al golpear dos veces",
@@ -130,7 +130,7 @@
                 wonPillarCracked: "PILAR AGRIETADO",
                 wonPyramidCracked: "PIRÁMIDE AGRIETADA",
                 wonHeartShattered: "CORAZÓN DESTROZADO",
-                iceHeart: "CORAZÓN DE HIELO",
+                iceHeart: "CORAZÓN CONGELADO",
                 obsidianGeode: "GEODA DE OBSIDIANA",
                 wonGeodeCracked: "GEODA AGRIETADA",
                 obsidianHint: "obsidiana - se agrieta y luego se astilla",
@@ -200,7 +200,7 @@
                 loading: "Chargement",
                 dragHint: "glisser pour tourner - taper pour frapper",
                 searchRelicsHint: "cherchez les gemmes cachées",
-                relicGleams: "une gemme brille - tapez pour la ramasser",
+                relicGleams: "Vous avez trouvé une gemme !",
                 relicsRemain2: "deux gemmes restantes",
                 relicsRemain1: "une gemme restante",
                 iceHint: "glace - se fissure puis se brise en frappant deux fois",
@@ -214,7 +214,7 @@
                 wonPillarCracked: "PILIER BRISÉ",
                 wonPyramidCracked: "PYRAMIDE BRISÉE",
                 wonHeartShattered: "CŒUR BRISÉ",
-                iceHeart: "CŒUR DE GLACE",
+                iceHeart: "CŒUR GELÉ",
                 obsidianGeode: "GÉODE D'OBSIDIENNE",
                 wonGeodeCracked: "GÉODE BRISÉE",
                 obsidianHint: "obsidienne - se fissure puis éclate",
@@ -284,7 +284,7 @@
                 loading: "加载中",
                 dragHint: "滑动以旋转石体 - 轻触以敲击",
                 searchRelicsHint: "寻找隐藏的宝石",
-                relicGleams: "宝石显现 - 轻触以收集",
+                relicGleams: "你找到了宝石！",
                 relicsRemain2: "还剩两颗宝石",
                 relicsRemain1: "还剩一颗宝石",
                 iceHint: "冰块 - 敲击产生裂缝，再次敲击即可击碎",
@@ -298,7 +298,7 @@
                 wonPillarCracked: "石柱已破",
                 wonPyramidCracked: "金字塔已开",
                 wonHeartShattered: "冰心粉碎",
-                iceHeart: "极寒冰心",
+                iceHeart: "冰封之心",
                 obsidianGeode: "黑曜晶洞",
                 wonGeodeCracked: "晶洞已破",
                 obsidianHint: "黑曜石 - 先裂纹，再碎裂",
@@ -368,7 +368,7 @@
                 loading: "載入中",
                 dragHint: "滑動以旋轉石體 - 輕觸以敲擊",
                 searchRelicsHint: "尋找隱藏的寶石",
-                relicGleams: "寶石顯現 - 輕觸以收集",
+                relicGleams: "你找到了寶石！",
                 relicsRemain2: "還剩兩顆寶石",
                 relicsRemain1: "還剩一顆寶石",
                 iceHint: "冰塊 - 敲擊產生裂縫，再次敲擊即可擊碎",
@@ -382,7 +382,7 @@
                 wonPillarCracked: "石柱已破",
                 wonPyramidCracked: "金字塔已開",
                 wonHeartShattered: "冰心粉碎",
-                iceHeart: "極寒冰心",
+                iceHeart: "冰封之心",
                 obsidianGeode: "黑曜晶洞",
                 wonGeodeCracked: "晶洞已破",
                 obsidianHint: "黑曜石 - 先裂紋，再碎裂",
@@ -451,7 +451,7 @@
                 loading: "جاري التحميل",
                 dragHint: "اسحب للتدوير - اضغط للضرب",
                 searchRelicsHint: "ابحث عن الجواهر المخفية",
-                relicGleams: "تلمع جوهرة - اضغط لجمعها",
+                relicGleams: "لقد وجدت جوهرة!",
                 relicsRemain2: "تبقى جوهرتان",
                 relicsRemain1: "تبقى جوهرة واحدة",
                 iceHint: "جليد - يتصدع ثم يتحطم عند ضربه مرتين",
@@ -465,7 +465,7 @@
                 wonPillarCracked: "تم كسر العمود",
                 wonPyramidCracked: "تم كسر الهرم",
                 wonHeartShattered: "تحطم القلب",
-                iceHeart: "قلب جليدي",
+                iceHeart: "قلب متجمد",
                 obsidianGeode: "جيود السبج",
                 wonGeodeCracked: "تم كسر الجيود",
                 obsidianHint: "السبج - يتصدع ثم يتشظى",
@@ -536,7 +536,7 @@
                 loading: "लोड हो रहा है",
                 dragHint: "घुमाने के लिए खींचें - प्रहार करने के लिए टैप करें",
                 searchRelicsHint: "छिपे हुए रत्न खोजें",
-                relicGleams: "एक रत्न चमक रहा है - लेने के लिए टैप करें",
+                relicGleams: "आपको एक रत्न मिला!",
                 relicsRemain2: "दो रत्न बाकी हैं",
                 relicsRemain1: "एक रत्न बाकी है",
                 iceHint: "बर्फ - दो बार प्रहार करने पर दरार पड़ती है फिर टूटती है",
@@ -550,7 +550,7 @@
                 wonPillarCracked: "स्तंभ टूट गया",
                 wonPyramidCracked: "पिरामिड टूट गया",
                 wonHeartShattered: "दिल चकनाचूर",
-                iceHeart: "बर्फ का दिल",
+                iceHeart: "जमा हुआ दिल",
                 obsidianGeode: "ओब्सीडियन जियोड",
                 wonGeodeCracked: "जियोड टूट गया",
                 obsidianHint: "ओब्सीडियन - चटकती है फिर बिखरती है",
@@ -620,7 +620,7 @@
                 loading: "読み込み中",
                 dragHint: "ドラッグで回転 - タップで叩く",
                 searchRelicsHint: "隠された宝石を探そう",
-                relicGleams: "宝石が光っている - タップして手に入れよう",
+                relicGleams: "宝石を見つけた！",
                 relicsRemain2: "宝石が2つ残っている",
                 relicsRemain1: "宝石が1つ残っている",
                 iceHint: "氷 - 2回叩くとひびが入り、砕ける",
@@ -634,7 +634,7 @@
                 wonPillarCracked: "柱破壊",
                 wonPyramidCracked: "ピラミッド破壊",
                 wonHeartShattered: "ハート粉砕",
-                iceHeart: "氷のハート",
+                iceHeart: "凍てつくハート",
                 obsidianGeode: "黒曜石の晶洞",
                 wonGeodeCracked: "晶洞破壊",
                 obsidianHint: "黒曜石 - ひびが入り、その後砕け散る",
@@ -703,7 +703,7 @@
                 loading: "Загрузка",
                 dragHint: "потяните для поворота — коснитесь для удара",
                 searchRelicsHint: "ищите скрытые самоцветы",
-                relicGleams: "самоцвет мерцает — коснитесь, чтобы забрать его",
+                relicGleams: "Вы нашли самоцвет!",
                 relicsRemain2: "осталось два самоцвета",
                 relicsRemain1: "остался один самоцвет",
                 iceHint: "лёд — трескается, затем разбивается после двух ударов",
@@ -717,7 +717,7 @@
                 wonPillarCracked: "КОЛОННА РАЗБИТА",
                 wonPyramidCracked: "ПИРАМИДА РАЗБИТА",
                 wonHeartShattered: "СЕРДЦЕ РАЗБИТО",
-                iceHeart: "ЛЕДЯНОЕ СЕРДЦЕ",
+                iceHeart: "ЗАМЁРЗШЕЕ СЕРДЦЕ",
                 obsidianGeode: "ОБСИДИАНОВАЯ ЖЕОДА",
                 wonGeodeCracked: "ЖЕОДА РАЗБИТА",
                 obsidianHint: "обсидиан — трескается, затем рассыпается",
@@ -1617,9 +1617,10 @@
             function pyramid(half) {
                 const S = 1.3;           // 30% larger than the cube/cylinder (deeper to dig)
                 const w = half * 1.15 * S; // base half-width
-                const H = half * 2.0 * S;  // full height, centered on origin
-                const y0 = -H / 2;
-                const apex = new V3(0, H / 2, 0);
+                const H = half * 2.0 * S;  // full height
+                const yShift = H * 0.14;   // move pyramid up a small distance for balanced vertical framing
+                const y0 = -H / 2 + yShift;
+                const apex = new V3(0, H / 2 + yShift, 0);
                 const b = [
                     new V3(-w, y0, -w),
                     new V3(w, y0, -w),
@@ -1631,7 +1632,7 @@
                     const j = (i + 1) % 4;
                     faces.push([b[i], b[j], apex.clone()]); // triangular side
                 }
-                return makeShape(faces, { x: w, y: H / 2, z: w }, (2 * w) * (2 * w) * H / 3);
+                return makeShape(faces, { x: w, y: H / 2 + yShift, z: w }, (2 * w) * (2 * w) * H / 3);
             }
 
             function octahedron(half) {
@@ -1701,8 +1702,8 @@
                 const h = half;
                 const p = (x, y, z) => new V3(x * h, y * h, z * h);
                 const P_bot = p(0, -1.2, 0);
-                const P_left = p(-1.0, 0.1, 0);
-                const P_right = p(1.0, 0.1, 0);
+                const P_left = p(-0.85, 0.1, 0);
+                const P_right = p(0.85, 0.1, 0);
                 const P_front = p(0, 0.15, 0.6);
                 const P_back = p(0, 0.15, -0.6);
                 const P_ltop = p(-0.5, 0.95, 0);
@@ -2699,7 +2700,7 @@
                 // you have to dig down to one before you can even hit it.
                 { shape: 'pyramid', colors: SANDSTONE, name: 'SANDSTONE PYRAMID', won: 'PYRAMID CRACKED', cam: 1.15, chunkMul: 1.3 * 1.3 * 1.3, blocks: 1, bg: 'radial-gradient(120% 90% at 50% 38%, #58421e 0%, #322111 55%, #1b1309 100%)' },
                 {
-                    shape: 'heart', colors: ICE, name: 'ICE HEART', won: 'HEART SHATTERED', break: 'ice', rough: 0.5, metal: 0.06, rods: 2,
+                    shape: 'heart', colors: ICE, name: 'FROZEN HEART', won: 'HEART SHATTERED', break: 'ice', rough: 0.5, metal: 0.06, rods: 2,
                     sizeMul: ICE_SIZE * 1.35 * 0.88 * 1.5 * ICE_GROW * 0.88, cam: ICE_SIZE * 0.75 * 1.5 * 1.15 * ICE_CAM * 0.84 * 0.95, chunkMul: 0.18 * 1.5 * 1.5 * 1.5 * ICE_GROW * ICE_GROW * ICE_GROW,
                     // Fixed anchors keep the three relics in separate lobes / lower point of the heart.
                     // Values are normalized to this shape's x/y/z bounds, so they scale with the heart.
@@ -3534,11 +3535,11 @@ uniform float uDim;
                 p.target.group.getWorldPosition(_pingWorld);
                 // The diamond reads as a depth cue: it shrinks the deeper the relic sits away
                 // from the camera. Measure the distance BEFORE projecting (project() mutates
-                // the scratch vector). The ring deliberately keeps a constant size, so it stays
-                // a readable, consistent pulse whatever the depth.
+                // the scratch vector). The size also scales dynamically with the game's --u scale.
                 const dist = _pingWorld.distanceTo(camera.position);
                 const refDist = camera.position.distanceTo(CAM_LOOK);
-                const scale = Math.max(0.45, Math.min(1.7, refDist / Math.max(dist, 0.001)));
+                const depthScale = Math.max(0.45, Math.min(1.7, refDist / Math.max(dist, 0.001)));
+                const u = parseFloat(document.documentElement.style.getPropertyValue('--u')) || 1;
                 const v = _scratchPos.copy(_pingWorld).project(camera);
                 const host = canvasHost.getBoundingClientRect();
                 const x = (v.x * 0.5 + 0.5) * host.width + host.left;
@@ -3546,16 +3547,22 @@ uniform float uDim;
                 const gs = p.gem.style;
                 gs.left = x + 'px';
                 gs.top = y + 'px';
-                if (Math.abs(scale - p.scale) > 0.01) { // glow/size only when depth really changed
-                    p.scale = scale;
-                    const size = GEM_PING_BASE * scale;
+                if (Math.abs(depthScale - p.scale) > 0.01 || Math.abs(u - (p.u || 0)) > 0.01) {
+                    p.scale = depthScale;
+                    p.u = u;
+                    const size = GEM_PING_BASE * depthScale * u;
                     gs.width = size + 'px';
                     gs.height = size + 'px';
-                    gs.borderRadius = (7 * scale) + 'px';
-                    gs.boxShadow = `0 0 ${14 * scale}px ${p.css}, 0 0 ${34 * scale}px ${p.css}, 0 0 ${62 * scale}px ${p.css}`;
+                    gs.borderRadius = (7 * depthScale * u) + 'px';
+                    gs.boxShadow = `0 0 ${14 * depthScale * u}px ${p.css}, 0 0 ${34 * depthScale * u}px ${p.css}, 0 0 ${62 * depthScale * u}px ${p.css}`;
                 }
-                p.ring.style.left = x + 'px';
-                p.ring.style.top = y + 'px';
+                const rs = p.ring.style;
+                rs.left = x + 'px';
+                rs.top = y + 'px';
+                const ringSize = GEM_PING_BASE * u;
+                rs.width = ringSize + 'px';
+                rs.height = ringSize + 'px';
+                rs.borderWidth = (2 * u) + 'px';
             }
 
             function updateGemPings(dt) {
@@ -4731,24 +4738,37 @@ uniform float uDim;
             // buckles for BAND_HP blows and then shears off in one whole piece.
             function buildRods(count) {
                 const b = shape.bound;
-                const L = Math.hypot(b.x, b.y) * 1.43;  // half-length spike, 10% longer
-                const r = Math.min(b.x, b.z) * 0.135;   // slightly slimmer steel rod
+                const r = Math.min(b.x, b.z) * 0.135; // steel rod radius
                 const n = Math.max(1, Math.min(count | 0, 2));
-                const tilts = [0, Math.PI / 2]; // upright + level: a plus-shaped cross through the heart
+
+                // Rod 0: vertical spike (upright along Y)
+                // Rod 1: horizontal spike (across X), crossing at the heart's upper core
+                const rodConfigs = [
+                    {
+                        length: b.y * 2.05,
+                        pos: new V3(0, -0.05 * b.y, r * 1.05),
+                        rot: new THREE.Euler(0.04, 0, 0),
+                    },
+                    {
+                        length: b.x * 2.80,
+                        pos: new V3(0, 0.08 * b.y, -r * 1.05),
+                        rot: new THREE.Euler(-0.04, 0, Math.PI / 2),
+                    },
+                ];
+
                 for (let i = 0; i < n; i++) {
-                    const sign = (i % 2 === 0) ? 1 : -1;
+                    const cfg = rodConfigs[i % rodConfigs.length];
+                    const L = cfg.length;
                     const mat = new THREE.MeshStandardMaterial({
                         color: 0x9aa3ad, roughness: 0.30, metalness: 0.95, flatShading: true,
                         emissive: 0xffd9a0, emissiveIntensity: 0,
                     });
-                    // tapered cylinder: pointed at one end, blunt at the other, so it reads as a spike
                     const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 8), mat);
-                    mesh.quaternion.setFromEuler(new THREE.Euler(sign * 0.20, 0, tilts[i % tilts.length]));
-                    const upright = (i % tilts.length) === 0; // the vertical rod sits a little lower
-                    mesh.position.set(0, b.y * (upright ? -0.10 : 0.06), sign * r * 1.4); // offset in z so they cross, not clip
+                    mesh.position.copy(cfg.pos);
+                    mesh.quaternion.setFromEuler(cfg.rot);
                     cubeGroup.add(mesh);
-                    // invisible tap target sleeved over the rod, trimmed in a touch from the old
-                    // radius so taps just off the steel land on the ice instead
+
+                    // invisible tap target sleeved over the rod
                     const hit = new THREE.Mesh(
                         new THREE.CylinderGeometry(r * 2.8, r * 2.8, L, 10, 1, true),
                         new THREE.MeshBasicMaterial({
@@ -4759,6 +4779,7 @@ uniform float uDim;
                     hit.quaternion.copy(mesh.quaternion);
                     hit.userData.kind = 'band';
                     cubeGroup.add(hit);
+
                     const rig = {
                         mesh, mat, hit, hits: 0, shake: 0, rod: true,
                         y: mesh.position.y, home: mesh.position.clone(),
@@ -5607,9 +5628,6 @@ uniform float uDim;
                 spawnCubeDust(hitWorld, swing.n);
                 spawnShockwave(hitWorld, swing.n);
                 flash(hitWorld);
-
-                // Spawn vignette flash based on level material
-                triggerVignetteFlash(vignetteFlashColor());
 
                 // Spawn impact sparks
                 spawnImpactSparks(hitWorld, 12);
@@ -7079,15 +7097,8 @@ uniform float uDim;
                 }
             }
 
-            let _vignetteEl = null;
-            function triggerVignetteFlash(colorHex) {
-                if (!_vignetteEl) _vignetteEl = document.getElementById('vignette');
-                if (!_vignetteEl) return;
-                _vignetteEl.style.setProperty('--vignette-flash', colorHex);
-                _vignetteEl.classList.remove('flash');
-                requestAnimationFrame(() => {
-                    if (_vignetteEl) _vignetteEl.classList.add('flash');
-                });
+            function triggerVignetteFlash() {
+                // Screen flash on hit disabled
             }
 
             const _sparkColor = new THREE.Color();
@@ -7188,9 +7199,9 @@ uniform float uDim;
 
                 const el = _getJuiceEl();
                 el.style.display = '';
-                if (text === 'UNEARTHED!!!') {
+                if (text === 'UNEARTHED!!!' || text === 'SECRET RING!!!') {
                     y -= 30;
-                    el.className = 'juice-text unearthed-text';
+                    el.className = text === 'SECRET RING!!!' ? 'juice-text secret-ring-text' : 'juice-text unearthed-text';
                     el.style.color = '#ffffff';
                     el.style.textShadow = `
                         0 0 6px #ffffff,
