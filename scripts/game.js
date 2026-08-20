@@ -2346,6 +2346,14 @@ if (document.readyState === 'loading') {
             window._cubeMusicGain = window._cubeAudioCtx.createGain();
             window._cubeMusicGain.gain.value = window.musicVolume !== undefined ? window.musicVolume : 0.5;
             window._cubeMusicGain.connect(window._cubeAudioCtx.destination);
+
+            // The context can be created long after the host reported its audio
+            // state, so re-apply it to the fresh nodes rather than trusting the
+            // defaults above.
+            if (!hostAudioEnabled) {
+                window._cubeMasterGain.gain.value = 0;
+                window._cubeMusicGain.gain.value = 0;
+            }
         }
         ctx = window._cubeAudioCtx;
         masterGain = window._cubeMasterGain;
@@ -2357,18 +2365,36 @@ if (document.readyState === 'loading') {
         return ctx;
     }
 
+    // The host owns whether this game may make a sound at all. The in-game sliders
+    // are granular SFX/music trims that ride UNDERNEATH it — they can never turn
+    // audio back on while the host has it off, which is what the platform requires.
+    let hostAudioEnabled = true;
+
+    // Assigned rather than scheduled. An automation event and the param's own
+    // value are separate things, and mixing them makes "is this bus actually
+    // muted right now?" unanswerable — which is a poor property for the one
+    // control the platform requires the game to honour. Direct assignment takes
+    // effect at once and reads back, so the host-mute state is verifiable.
+    function applyGains() {
+        if (masterGain) masterGain.gain.value = hostAudioEnabled ? window.masterVolume : 0;
+        if (musicGain) musicGain.gain.value = hostAudioEnabled ? window.musicVolume : 0;
+    }
+
+    // Called from the portal bridge with the host's initial state and on every
+    // change. Takes effect immediately.
+    function setHostAudioEnabled(on) {
+        hostAudioEnabled = on !== false;
+        applyGains();
+    }
+
     function setMasterVol(val) {
         window.masterVolume = val;
-        if (ctx && masterGain) {
-            masterGain.gain.setValueAtTime(val, ctx.currentTime);
-        }
+        applyGains();
     }
 
     function setMusicVol(val) {
         window.musicVolume = val;
-        if (ctx && musicGain) {
-            musicGain.gain.setValueAtTime(val, ctx.currentTime);
-        }
+        applyGains();
     }
 
     let noiseBuf = null;
@@ -2759,7 +2785,7 @@ if (document.readyState === 'loading') {
         });
     }
 
-    window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol };
+    window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
 })();
 
 
@@ -8725,6 +8751,13 @@ uniform float uDim;
         // subscriptions taken before the handshake resolves.
         sdk.onPause(hostPause);
         sdk.onResume(hostResume);
+
+        // Host audio state, now and on every change. The in-game sliders trim
+        // underneath this and can never override it.
+        if (window.CubeCrackerAudio && window.CubeCrackerAudio.setHostAudioEnabled) {
+            window.CubeCrackerAudio.setHostAudioEnabled(sdk.isAudioEnabled());
+            sdk.onAudioEnabledChange((on) => window.CubeCrackerAudio.setHostAudioEnabled(on));
+        }
 
         // Saved records and options. applySavedState merges rather than replaces,
         // so anything achieved in the seconds before this landed survives; calling
