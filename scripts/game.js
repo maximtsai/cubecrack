@@ -1,5 +1,5 @@
 // Gems in the cube - game logic (extracted from index.html into game.js)
-// Order matters: defaults -> fracture -> audio -> main game -> tweaks panel
+// Order matters: defaults -> fracture -> audio -> main game
 
 
 // Global Volume & Language Defaults
@@ -191,6 +191,7 @@ window.TRANSLATIONS = {
         championshipComplete: "CHAMPIONSHIP COMPLETE",
         gameScoreboard: "GAME SCOREBOARD",
         totalHitsLabel: "TOTAL HITS: {total}",
+        totalStarsLabel: "STARS: {stars}",
         bestScoreLabel: "BEST: {strikes}",
         secretRingLabel: "SECRET RING FOUND",
         rankGoldLabel: "GOLD RANK",
@@ -275,6 +276,7 @@ window.TRANSLATIONS = {
         championshipComplete: "CAMPEONATO COMPLETADO",
         gameScoreboard: "TABLA DE PUNTUACIÓN",
         totalHitsLabel: "GOLPES TOTALES: {total}",
+        totalStarsLabel: "ESTRELLAS: {stars}",
         bestScoreLabel: "MEJOR: {strikes}",
         secretRingLabel: "ANILLO SECRETO ENCONTRADO",
         rankGoldLabel: "RANGO ORO",
@@ -359,6 +361,7 @@ window.TRANSLATIONS = {
         championshipComplete: "CHAMPIONNAT TERMINÉ",
         gameScoreboard: "TABLEAU DES SCORES",
         totalHitsLabel: "TOTAL DES COUPS : {total}",
+        totalStarsLabel: "ÉTOILES : {stars}",
         bestScoreLabel: "MEILLEUR : {strikes}",
         secretRingLabel: "ANNEAU SECRET TROUVÉ",
         rankGoldLabel: "RANG OR",
@@ -443,6 +446,7 @@ window.TRANSLATIONS = {
         championshipComplete: "全部通关",
         gameScoreboard: "游戏计分板",
         totalHitsLabel: "总锤击数: {total}",
+        totalStarsLabel: "星星: {stars}",
         bestScoreLabel: "最佳: {strikes}",
         secretRingLabel: "发现秘密金环",
         rankGoldLabel: "金牌评级",
@@ -527,6 +531,7 @@ window.TRANSLATIONS = {
         championshipComplete: "全部通關",
         gameScoreboard: "遊戲計分板",
         totalHitsLabel: "總錘擊數: {total}",
+        totalStarsLabel: "星星: {stars}",
         bestScoreLabel: "最佳: {strikes}",
         secretRingLabel: "發現秘密金環",
         rankGoldLabel: "金牌評級",
@@ -611,6 +616,7 @@ window.TRANSLATIONS = {
         championshipComplete: "اكتملت البطولة",
         gameScoreboard: "لوحة النتائج",
         totalHitsLabel: "إجمالي الضربات: {total}",
+        totalStarsLabel: "النجوم: {stars}",
         bestScoreLabel: "الأفضل: {strikes}",
         secretRingLabel: "تم العثور على الحلقة السرية",
         rankGoldLabel: "رتبة ذهبية",
@@ -695,6 +701,7 @@ window.TRANSLATIONS = {
         championshipComplete: "चैंपियनशिप पूर्ण",
         gameScoreboard: "स्कोरबोर्ड",
         totalHitsLabel: "कुल प्रहार: {total}",
+        totalStarsLabel: "सितारे: {stars}",
         bestScoreLabel: "सर्वश्रेष्ठ: {strikes}",
         secretRingLabel: "गुप्त सुनहरी अंगूठी मिली",
         rankGoldLabel: "स्वर्ण रैंक",
@@ -779,6 +786,7 @@ window.TRANSLATIONS = {
         championshipComplete: "全試練制覇",
         gameScoreboard: "スコアボード",
         totalHitsLabel: "総攻撃回数: {total}",
+        totalStarsLabel: "スター: {stars}",
         bestScoreLabel: "ベスト: {strikes}",
         secretRingLabel: "秘密の指輪を発見",
         rankGoldLabel: "ゴールドランク",
@@ -862,6 +870,7 @@ window.TRANSLATIONS = {
         championshipComplete: "ЧЕМПИОНАТ ПРОЙДЕН",
         gameScoreboard: "ТАБЛИЦА РЕЗУЛЬТАТОВ",
         totalHitsLabel: "ВСЕГО УДАРОВ: {total}",
+        totalStarsLabel: "ЗВЁЗДЫ: {stars}",
         bestScoreLabel: "ЛУЧШИЙ: {strikes}",
         secretRingLabel: "СЕКРЕТНОЕ КОЛЬЦО НАЙДЕНО",
         rankGoldLabel: "ЗОЛОТОЙ РАНГ",
@@ -1070,10 +1079,24 @@ window.applyTranslations = function () {
 
     const totalStats = document.getElementById('totalStats');
     if (totalStats && window.hitsPerLevel) {
-        const total = window.runTotalHits();
-        const currentCountVal = document.getElementById('totalHitsCount') ? document.getElementById('totalHitsCount').textContent : total;
-        const isBouncing = document.getElementById('totalHitsCount') && document.getElementById('totalHitsCount').classList.contains('bounce-active') ? 'class="bounce-active"' : '';
-        totalStats.innerHTML = window._t('totalHitsLabel', { total: `<span id="totalHitsCount" ${isBouncing} style="display: inline-block;">${currentCountVal}</span>` });
+        // Repaint without disturbing the count-up: carry over whatever each counter
+        // currently reads, and whether it has already popped, rather than resetting
+        // to the final value mid-animation.
+        const carry = (id, fallback) => {
+            const el = document.getElementById(id);
+            return {
+                text: el ? el.textContent : String(fallback),
+                cls: el && el.classList.contains('bounce-active') ? ' bounce-active' : '',
+            };
+        };
+        const hits = carry('totalHitsCount', window.runTotalHits());
+        const stars = carry('totalStarsCount', window.totalStars(window.hitsPerLevel));
+        totalStats.innerHTML =
+            '<span class="total-part">' +
+            window._t('totalHitsLabel', { total: `<span id="totalHitsCount" class="total-count${hits.cls}">${hits.text}</span>` }) +
+            '</span><span class="total-part total-part-stars">' +
+            window._t('totalStarsLabel', { stars: `<span id="totalStarsCount" class="total-count${stars.cls}">${stars.text}</span>` }) +
+            '</span>';
     }
 
     const restartGameBtn = document.getElementById('restartGame');
@@ -1086,11 +1109,12 @@ window.applyTranslations = function () {
             const lvlNameKey = window.LEVEL_NAME_KEYS[idx] || 'stoneCube';
             const localizedName = window._t ? window._t(lvlNameKey) : lvl.name;
 
+            // Same class the scoreboard builder uses. These inline styles used to
+            // diverge from it — a fixed 24px where .level-stat-row scales with --u —
+            // so switching language on the end card silently re-rendered every row
+            // at desktop size and blew the layout apart on a phone.
             const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.justifyContent = 'space-between';
-            row.style.fontSize = '24px';
-            row.style.color = 'var(--dim)';
+            row.className = 'level-stat-row';
             row.innerHTML = `<span>${localizedName}</span>${window.hitsCellMarkup(idx)}`;
             levelStatsContainer.appendChild(row);
         });
@@ -1145,6 +1169,27 @@ window.rankRowMarkup = function (levelIdx, hits) {
     const rank = window.starRankFor(levelIdx, hits);
     const style = window.RANK_STYLE[rank.tier];
     return `<span style="color: ${style.color}; letter-spacing: 0.06em; margin-left: 12px;">${window.rankStarsText(rank)}</span>`;
+};
+
+// Stars earned across a set of per-level results: 3 for gold, 2 for silver, 1 for
+// bronze, and none for a level with no result at all. 36 is a perfect game.
+window.totalStars = function (scores) {
+    const list = scores || [];
+    let n = 0;
+    for (let i = 0; i < list.length; i++) {
+        if (list[i] == null) continue;
+        n += window.RANK_STYLE[window.starRankFor(i, list[i]).tier].stars;
+    }
+    return n;
+};
+
+// The value YouTube ranks. Taken from the saved records rather than this run,
+// because the platform sorts highest-first and requires the submitted score to
+// match the player's best result in save data — and because stars only ever go
+// up, which a run-scoped total would not.
+window.submitStarScore = function () {
+    if (!window.GameSDK) return;
+    window.GameSDK.setScore(window.totalStars(window.bestScores));
 };
 
 // Total strikes over the levels actually played this run, skipping the unplayed ones.
@@ -1408,10 +1453,10 @@ const initOptions = () => {
 
 window.ringsFound = Array(12).fill(false);
 
-// Load the authored per-level data file (star-rank thresholds live in `gameConfig`).
-// Seed with built-in defaults so star ranks are available immediately; the fetch
-// overwrites them with the server-authored values once it completes.
-window.gameConfig = window.gameConfig || {
+// Star-rank thresholds, per level. Authored here rather than fetched: this was
+// the game's only runtime network request, and the file it pulled carried nothing
+// else the game read.
+window.gameConfig = {
     starRanks: [
         { gold: 6,  silver: 10 },
         { gold: 8,  silver: 12 },
@@ -1427,18 +1472,6 @@ window.gameConfig = window.gameConfig || {
         { gold: 5,  silver: 10 }
     ]
 };
-fetch('config')
-    .then((r) => {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-    })
-    .then((cfg) => {
-        window.gameConfig = cfg;
-        if (window.renderLevelList) window.renderLevelList(); // stars may change now
-    })
-    .catch((e) => {
-        console.warn('Failed to load config; keeping default star ranks', e);
-    });
 
 // Audit key coverage and placeholder parity once after the table has been defined.
 window.validateTranslations();
@@ -7631,6 +7664,7 @@ uniform float uDim;
             isNewBest = true;
             window.bestScores[level] = strikes;
             window.persistGameState();
+            window.submitStarScore(); // a new best is the only thing that moves the star total
             if (window.renderLevelList) window.renderLevelList();
         }
         if (window.applyTranslations) window.applyTranslations();
@@ -7702,6 +7736,21 @@ uniform float uDim;
     function buildChampionshipScoreboard() {
         const totalHits = window.runTotalHits();
         const totalHitsCount = document.getElementById('totalHitsCount');
+        // Stars for THIS run, so the tally agrees with the per-level star rows
+        // directly above it. The score sent to the platform is the all-time total
+        // from save data instead — see submitStarScore().
+        const runStars = window.totalStars(window.hitsPerLevel);
+        const totalStarsCount = document.getElementById('totalStarsCount');
+        if (totalStarsCount) {
+            totalStarsCount.textContent = runStars;
+            totalStarsCount.classList.remove('bounce-active');
+        }
+        // Lands on the same beat as the hit counter finishing its count-up.
+        const popStars = () => {
+            if (!totalStarsCount) return;
+            totalStarsCount.classList.add('bounce-active');
+            spawnSparklesAround(totalStarsCount);
+        };
 
         const spawnSparklesAround = (el) => {
             const rect = el.getBoundingClientRect();
@@ -7758,6 +7807,7 @@ uniform float uDim;
                         totalHitsCount.textContent = currentVal;
                         totalHitsCount.classList.add('bounce-active');
                         spawnSparklesAround(totalHitsCount);
+                        popStars();
                         if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) {
                             window.CubeCrackerAudio.chime(2);
                         }
@@ -7769,6 +7819,7 @@ uniform float uDim;
                 totalHitsCount.textContent = "0";
                 totalHitsCount.classList.add('bounce-active');
                 spawnSparklesAround(totalHitsCount);
+                popStars();
             }
         }
 
@@ -8545,20 +8596,6 @@ uniform float uDim;
         restartGameBtn.addEventListener('click', nextTrial);
     }
 
-    // Tweaks bridge
-    if (window._cubeTweaks) window.removeEventListener('cube-tweaks', window._cubeTweaks);
-    window._cubeTweaks = (e) => {
-        const t = e.detail || {};
-        if (t.hammerPower) {
-            cfg.hitRadius = { light: 0.4, standard: 0.55, heavy: 0.74 }[t.hammerPower] || 0.55;
-        }
-        if (t.fractureDetail && t.fractureDetail !== cfg.chunkCount) {
-            cfg.chunkCount = t.fractureDetail;
-            build();
-        }
-    };
-    window.addEventListener('cube-tweaks', window._cubeTweaks);
-
     // Warm up the renderer: pre-compiles all materials and shader programs before
     // gameplay begins so the first hammer strike, impact particles, shockwaves, and
     // debris detachment execute without any GPU compilation hitches.
@@ -8765,6 +8802,10 @@ uniform float uDim;
         const saved = await withTimeout(sdk.loadJSON(), 5000, null);
         window.applySavedState(saved);
 
+        // Re-assert the ranked value for a returning player, in case an earlier
+        // submission never reached the platform. Nothing to say for a new one.
+        if (window.totalStars(window.bestScores) > 0) window.submitStarScore();
+
         // Locale. An explicit choice the player saved outranks the host's, so only
         // ask the platform when the record didn't carry one.
         if (!(saved && saved.settings && saved.settings.lang)) {
@@ -8786,205 +8827,4 @@ uniform float uDim;
         coreGlow: () => coreGlowLight ? { i: coreGlowLight.intensity.toFixed(3), c: coreGlowLight.color.getHexString(), s: coreGlowSurge } : null,
     };
 })();
-
-
-
-// Gems in the cube - Tweaks panel (vanilla DOM; no React/Babel).
-// Floating dev panel that bridges into the Three.js game via a `cube-tweaks`
-// CustomEvent. Hidden until the host activates edit mode. Persists edits back to
-// the host by posting `__edit_mode_set_keys` (the host rewrites the EDITMODE
-// block below on disk).
-(function () {
-    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-        "hammerPower": "standard",
-        "fractureDetail": 150
-    }/*EDITMODE-END*/;
-
-    const HAMMER_OPTIONS = ['light', 'standard', 'heavy'];
-    const FRACTURE = { min: 80, max: 260, step: 10 };
-
-    const STYLE = `
-  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:420px;
-    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
-    transform:scale(var(--dc-inv-zoom,1));transform-origin:bottom right;
-    background:rgba(250,249,247,.78);color:#29261b;
-    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
-    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
-    font:24px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
-  .twk-hd{display:flex;align-items:center;justify-content:space-between;
-    padding:10px 8px 10px 14px;cursor:move;user-select:none}
-  .twk-hd b{font-size:24px;font-weight:600;letter-spacing:.01em}
-  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
-    width:44px;height:44px;border-radius:6px;cursor:default;font-size:24px;line-height:1}
-  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
-  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:14px;
-    overflow-y:auto;overflow-x:hidden;min-height:0}
-  .twk-row{display:flex;flex-direction:column;gap:8px}
-  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
-    color:rgba(41,38,27,.72)}
-  .twk-lbl>span:first-child{font-weight:500}
-  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums;font-size:24px}
-  .twk-sect{font-size:24px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
-    color:rgba(41,38,27,.45);padding:10px 0 0}
-  .twk-sect:first-child{padding-top:0}
-  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:8px;margin:6px 0;
-    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
-  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
-    width:24px;height:24px;border-radius:50%;background:#fff;
-    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
-  .twk-slider::-moz-range-thumb{width:24px;height:24px;border-radius:50%;
-    background:#fff;border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
-  .twk-seg{position:relative;display:flex;padding:4px;border-radius:8px;
-    background:rgba(0,0,0,.06);user-select:none}
-  .twk-seg-thumb{position:absolute;top:4px;bottom:4px;border-radius:6px;
-    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
-    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
-  .twk-seg.dragging .twk-seg-thumb{transition:none}
-  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
-    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:44px;
-    border-radius:6px;cursor:default;padding:8px 12px;line-height:1.2;overflow-wrap:anywhere}
-  `;
-
-    const state = Object.assign({}, TWEAK_DEFAULTS);
-
-    // ---- persistence + game bridge ----
-    function persist(edits) {
-        try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*'); } catch (e) { }
-        window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
-    }
-    function emit() {
-        window.dispatchEvent(new CustomEvent('cube-tweaks', { detail: Object.assign({}, state) }));
-    }
-    function setTweak(key, val) {
-        if (state[key] === val) return;
-        state[key] = val;
-        persist({ [key]: val });
-        emit();
-        sync();
-    }
-
-    // ---- build DOM ----
-    const host = document.getElementById('tweaks-root');
-    const styleEl = document.createElement('style');
-    styleEl.textContent = STYLE;
-
-    const panel = document.createElement('div');
-    panel.className = 'twk-panel';
-    panel.style.display = 'none';
-    panel.innerHTML = `
-    <div class="twk-hd"><b>Tweaks</b><button class="twk-x" aria-label="Close tweaks">✕</button></div>
-    <div class="twk-body">
-      <div class="twk-sect">Hammer</div>
-      <div class="twk-row">
-        <div class="twk-lbl"><span>Power</span></div>
-        <div class="twk-seg" role="radiogroup" data-role="hammer">
-          <div class="twk-seg-thumb"></div>
-          ${HAMMER_OPTIONS.map((o) => `<button type="button" role="radio" data-val="${o}">${o}</button>`).join('')}
-        </div>
-      </div>
-      <div class="twk-sect">Stone</div>
-      <div class="twk-row">
-        <div class="twk-lbl"><span>Fracture detail</span><span class="twk-val" data-role="frac-val"></span></div>
-        <input type="range" class="twk-slider" data-role="frac"
-               min="${FRACTURE.min}" max="${FRACTURE.max}" step="${FRACTURE.step}">
-      </div>
-    </div>`;
-
-    host.appendChild(styleEl);
-    host.appendChild(panel);
-
-    const seg = panel.querySelector('[data-role="hammer"]');
-    const segThumb = seg.querySelector('.twk-seg-thumb');
-    const segButtons = [...seg.querySelectorAll('button')];
-    const fracInput = panel.querySelector('[data-role="frac"]');
-    const fracVal = panel.querySelector('[data-role="frac-val"]');
-
-    // reflect current state into the controls
-    function sync() {
-        const n = HAMMER_OPTIONS.length;
-        const idx = Math.max(0, HAMMER_OPTIONS.indexOf(state.hammerPower));
-        segThumb.style.left = `calc(4px + ${idx} * (100% - 8px) / ${n})`;
-        segThumb.style.width = `calc((100% - 8px) / ${n})`;
-        segButtons.forEach((b) => b.setAttribute('aria-checked', b.dataset.val === state.hammerPower ? 'true' : 'false'));
-        fracInput.value = state.fractureDetail;
-        fracVal.textContent = state.fractureDetail;
-    }
-
-    // ---- control interaction ----
-    const segAt = (clientX) => {
-        const r = seg.getBoundingClientRect();
-        const inner = r.width - 4;
-        const i = Math.floor(((clientX - r.left - 2) / inner) * HAMMER_OPTIONS.length);
-        return HAMMER_OPTIONS[Math.max(0, Math.min(HAMMER_OPTIONS.length - 1, i))];
-    };
-    seg.addEventListener('pointerdown', (e) => {
-        seg.classList.add('dragging');
-        setTweak('hammerPower', segAt(e.clientX));
-        const move = (ev) => setTweak('hammerPower', segAt(ev.clientX));
-        const up = () => {
-            seg.classList.remove('dragging');
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-    });
-
-    fracInput.addEventListener('input', (e) => setTweak('fractureDetail', Number(e.target.value)));
-
-    // ---- draggable panel (clamped to viewport) ----
-    const PAD = 16;
-    const offset = { x: 16, y: 16 };
-    function clamp() {
-        const w = panel.offsetWidth, h = panel.offsetHeight;
-        offset.x = Math.min(Math.max(PAD, window.innerWidth - w - PAD), Math.max(PAD, offset.x));
-        offset.y = Math.min(Math.max(PAD, window.innerHeight - h - PAD), Math.max(PAD, offset.y));
-        panel.style.right = offset.x + 'px';
-        panel.style.bottom = offset.y + 'px';
-    }
-    panel.querySelector('.twk-hd').addEventListener('mousedown', (e) => {
-        if (e.target.classList.contains('twk-x')) return;
-        const r = panel.getBoundingClientRect();
-        const sx = e.clientX, sy = e.clientY;
-        const startRight = window.innerWidth - r.right;
-        const startBottom = window.innerHeight - r.bottom;
-        const move = (ev) => {
-            offset.x = startRight - (ev.clientX - sx);
-            offset.y = startBottom - (ev.clientY - sy);
-            clamp();
-        };
-        const up = () => {
-            window.removeEventListener('mousemove', move);
-            window.removeEventListener('mouseup', up);
-        };
-        window.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', up);
-    });
-
-    // ---- host edit-mode protocol ----
-    function open(show) {
-        panel.style.display = show ? 'flex' : 'none';
-        if (show) { sync(); clamp(); }
-    }
-    panel.querySelector('.twk-x').addEventListener('click', () => {
-        open(false);
-        try { window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*'); } catch (e) { }
-    });
-    if (window._twkResize) window.removeEventListener('resize', window._twkResize);
-    window._twkResize = () => { if (panel.style.display !== 'none') clamp(); };
-    window.addEventListener('resize', window._twkResize);
-
-    if (window._twkMessage) window.removeEventListener('message', window._twkMessage);
-    window._twkMessage = (e) => {
-        const t = e && e.data && e.data.type;
-        if (t === '__activate_edit_mode') open(true);
-        else if (t === '__deactivate_edit_mode') open(false);
-    };
-    window.addEventListener('message', window._twkMessage);
-
-    sync();
-    emit(); // push initial values to the game
-    try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (e) { }
-})();
-
 

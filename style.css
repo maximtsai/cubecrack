@@ -1475,7 +1475,7 @@ body.intro-hide-ui #options-btn {
 #endCard {
     display: none;
     width: 92%;
-    max-width: calc(var(--u) * 480);
+    max-width: calc(var(--u) * 520);
     padding: calc(var(--u) * 28) calc(var(--u) * 32);
     background: linear-gradient(135deg, #241e18 0%, #15120e 100%);
     border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.40);
@@ -1511,7 +1511,9 @@ body.intro-hide-ui #options-btn {
     width: 100%;
     max-height: 40vh;
     overflow-y: auto;
-    padding-right: calc(var(--u) * 6);
+    /* Clears the scrollbar. The star ratings sit at the right edge of every row,
+       so without a gap here they read as touching it. */
+    padding-right: calc(var(--u) * 14);
 }
 
 .level-stat-row {
@@ -1538,6 +1540,27 @@ body.intro-hide-ui #options-btn {
     border-bottom: calc(var(--u) * 1.5) solid rgba(232, 201, 138, 0.25);
     padding: calc(var(--u) * 10) 0;
     width: 100%;
+    /* hits and stars sit side by side, and wrap to two lines rather than
+       overflowing when a locale's labels are long or the viewport is narrow */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: calc(var(--u) * 8) calc(var(--u) * 24);
+}
+
+.total-part {
+    white-space: nowrap;
+}
+
+/* the star tally is the ranked value, so it carries the accent */
+.total-part-stars {
+    color: #ffd166;
+}
+
+/* inline-block so the pop animation has a box to scale */
+.total-count {
+    display: inline-block;
 }
 
 /* Click/Tap UI Pulse */

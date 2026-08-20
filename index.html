@@ -167,7 +167,8 @@
                 <!-- Level score lines will be injected here -->
             </div>
             <div id="totalStats">
-                TOTAL HITS: <span id="totalHitsCount">0</span>
+                <span class="total-part">TOTAL HITS: <span id="totalHitsCount" class="total-count">0</span></span>
+                <span class="total-part total-part-stars">STARS: <span id="totalStarsCount" class="total-count">0</span></span>
             </div>
 
             <!-- Leaderboard -->
@@ -175,8 +176,6 @@
             <button id="restartGame">START OVER</button>
         </div>
     </div>
-
-    <div id="tweaks-root"></div>
 
     <!-- YouTube Playables vendor SDK. Parser-blocking and FIRST, exactly as the
          platform docs specify, so window.ytgame exists before the adapter runs. -->
