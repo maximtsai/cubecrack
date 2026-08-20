@@ -23,8 +23,52 @@ const detectPlayerLanguage = () => {
 };
 
 window.currentLang = detectPlayerLanguage();
-window.hitsPerLevel = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+window.screenShakeEnabled = true;
+// null = not played in this run. It has to be distinguishable from 0: a level left
+// at 0 rendered as "0 hits" with no star rating, which reads as a flawless clear
+// rather than one the player never reached.
+window.hitsPerLevel = Array(12).fill(null);
 window.bestScores = Array(12).fill(null);
+
+// ---------- player settings persistence ----------
+// Everything the options panel can change lives in one record. The panel used to
+// write the shake/haptics flags to their own keys that nothing ever read back, so
+// every setting silently reset on reload; volume and language weren't saved at all.
+const SETTINGS_KEY = 'cube_cracker_settings';
+const SETTINGS_LANGS = ['en', 'es', 'fr', 'zh', 'zh-hant', 'ar', 'hi', 'ja', 'ru'];
+
+window.saveGameSettings = function () {
+    try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+            masterVolume: window.masterVolume,
+            musicVolume: window.musicVolume,
+            screenShakeEnabled: window.screenShakeEnabled !== false,
+            hapticsEnabled: window.hapticsEnabled !== false,
+            lang: window.currentLang,
+        }));
+    } catch (e) { /* private mode / quota: settings just won't persist */ }
+};
+
+(function loadGameSettings() {
+    const vol = (v, fallback) => (typeof v === 'number' && v >= 0 && v <= 1 ? v : fallback);
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch (e) { s = null; }
+    if (s && typeof s === 'object') {
+        window.masterVolume = vol(s.masterVolume, window.masterVolume);
+        window.musicVolume = vol(s.musicVolume, window.musicVolume);
+        if (typeof s.screenShakeEnabled === 'boolean') window.screenShakeEnabled = s.screenShakeEnabled;
+        if (typeof s.hapticsEnabled === 'boolean') window.hapticsEnabled = s.hapticsEnabled;
+        if (SETTINGS_LANGS.indexOf(s.lang) !== -1) window.currentLang = s.lang;
+        return;
+    }
+    // Migrate the two legacy write-only keys from before this record existed.
+    try {
+        const shake = localStorage.getItem('cube_cracker_screen_shake');
+        const haptics = localStorage.getItem('cube_cracker_haptics');
+        if (shake !== null) window.screenShakeEnabled = shake !== 'false';
+        if (haptics !== null) window.hapticsEnabled = haptics !== 'false';
+    } catch (e) { /* nothing to migrate */ }
+})();
 
 window.TRANSLATIONS = {
     en: {
@@ -442,7 +486,8 @@ window.TRANSLATIONS = {
         lensToolName: "寶石探測器",
         bombToolName: "爆破炸藥",
         bombSpent: "炸藥已用盡",
-        hapticsLabel: "觸覺 / 晃動",
+        hapticsLabel: "觸覺震動",
+        screenShakeLabel: "螢幕震動",
         onText: "開啟",
         offText: "關閉"
     },
@@ -855,6 +900,7 @@ window._t = function (key, replacements = {}) {
 window.setGameLanguage = function (locale) {
     if (!window.I18N.locales[locale] || window.currentLang === locale) return;
     window.currentLang = locale;
+    window.saveGameSettings();
     window.applyTranslations();
 };
 
@@ -968,7 +1014,7 @@ window.applyTranslations = function () {
 
     const totalStats = document.getElementById('totalStats');
     if (totalStats && window.hitsPerLevel) {
-        const total = window.hitsPerLevel.reduce((sum, h) => sum + h, 0);
+        const total = window.runTotalHits();
         const currentCountVal = document.getElementById('totalHitsCount') ? document.getElementById('totalHitsCount').textContent : total;
         const isBouncing = document.getElementById('totalHitsCount') && document.getElementById('totalHitsCount').classList.contains('bounce-active') ? 'class="bounce-active"' : '';
         totalStats.innerHTML = window._t('totalHitsLabel', { total: `<span id="totalHitsCount" ${isBouncing} style="display: inline-block;">${currentCountVal}</span>` });
@@ -983,14 +1029,13 @@ window.applyTranslations = function () {
         window.LEVELS.forEach((lvl, idx) => {
             const lvlNameKey = window.LEVEL_NAME_KEYS[idx] || 'stoneCube';
             const localizedName = window._t ? window._t(lvlNameKey) : lvl.name;
-            const hitsFormatted = window._t('levelHitsLabel', { hits: window.hitsPerLevel[idx] });
 
             const row = document.createElement('div');
             row.style.display = 'flex';
             row.style.justifyContent = 'space-between';
             row.style.fontSize = '24px';
             row.style.color = 'var(--dim)';
-            row.innerHTML = `<span>${localizedName}</span><span style="font-family: monospace; color: var(--gold);">${hitsFormatted}${window.rankRowMarkup(idx, window.hitsPerLevel[idx])}</span>`;
+            row.innerHTML = `<span>${localizedName}</span>${window.hitsCellMarkup(idx)}`;
             levelStatsContainer.appendChild(row);
         });
     }
@@ -1040,10 +1085,25 @@ window.rankStarsText = function (rank) {
 };
 
 window.rankRowMarkup = function (levelIdx, hits) {
-    if (!hits) return ''; // never played: nothing to rate
+    if (hits == null) return ''; // never played: nothing to rate
     const rank = window.starRankFor(levelIdx, hits);
     const style = window.RANK_STYLE[rank.tier];
     return `<span style="color: ${style.color}; letter-spacing: 0.06em; margin-left: 12px;">${window.rankStarsText(rank)}</span>`;
+};
+
+// Total strikes over the levels actually played this run, skipping the unplayed ones.
+window.runTotalHits = function () {
+    return (window.hitsPerLevel || []).reduce((sum, h) => sum + (h == null ? 0 : h), 0);
+};
+
+// Right-hand cell of one championship scoreboard row: "12 hits ★★☆", or a dash for a
+// level this run never reached. Both scoreboard painters go through here so they can
+// never disagree about what an unplayed level looks like.
+window.hitsCellMarkup = function (levelIdx) {
+    const hits = window.hitsPerLevel ? window.hitsPerLevel[levelIdx] : null;
+    if (hits == null) return '<span style="font-family: monospace; color: var(--dim);">—</span>';
+    const label = window._t('levelHitsLabel', { hits });
+    return `<span style="font-family: monospace; color: var(--gold);">${label}${window.rankRowMarkup(levelIdx, hits)}</span>`;
 };
 
 // Paints the big star row + tier label on the win card from window.currentRank.
@@ -1218,6 +1278,7 @@ const initOptions = () => {
         } else {
             window.masterVolume = val;
         }
+        window.saveGameSettings();
     });
 
     newMusicSlider.addEventListener('input', (e) => {
@@ -1228,6 +1289,7 @@ const initOptions = () => {
         } else {
             window.musicVolume = val;
         }
+        window.saveGameSettings();
     });
 
     // Handle Language dropdown change
@@ -1237,7 +1299,6 @@ const initOptions = () => {
         window.setGameLanguage(newLang);
     });
 
-    const shakeRow = newOverlay.querySelector('#shake-row');
     const newShakeToggle = newOverlay.querySelector('#shake-toggle');
     const shakeStatus = newOverlay.querySelector('#shake-status');
 
@@ -1246,7 +1307,7 @@ const initOptions = () => {
         if (shakeStatus) shakeStatus.textContent = newShakeToggle.checked ? window._t('onText') : window._t('offText');
         newShakeToggle.addEventListener('change', (e) => {
             window.screenShakeEnabled = e.target.checked;
-            try { localStorage.setItem('cube_cracker_screen_shake', String(window.screenShakeEnabled)); } catch (err) { }
+            window.saveGameSettings();
             if (shakeStatus) shakeStatus.textContent = window.screenShakeEnabled ? window._t('onText') : window._t('offText');
         });
     }
@@ -1266,7 +1327,7 @@ const initOptions = () => {
         if (hapticsStatus) hapticsStatus.textContent = newHapticsToggle.checked ? window._t('onText') : window._t('offText');
         newHapticsToggle.addEventListener('change', (e) => {
             window.hapticsEnabled = e.target.checked;
-            try { localStorage.setItem('cube_cracker_haptics', String(window.hapticsEnabled)); } catch (err) { }
+            window.saveGameSettings();
             if (hapticsStatus) hapticsStatus.textContent = window.hapticsEnabled ? window._t('onText') : window._t('offText');
         });
     }
@@ -2236,13 +2297,18 @@ if (document.readyState === 'loading') {
             if (!AC) return null;
             window._cubeAudioCtx = new AC();
 
+            // Two independent buses. `masterGain` is the SFX bus (every one-shot below
+            // connects to it) and `musicGain` is the music bus — they must NOT be
+            // chained: routing music through the SFX gain made the SFX slider a master
+            // volume, so dragging it to 0 silenced the music and left the music slider
+            // doing nothing.
             window._cubeMasterGain = window._cubeAudioCtx.createGain();
             window._cubeMasterGain.gain.value = window.masterVolume !== undefined ? window.masterVolume : 1.0;
             window._cubeMasterGain.connect(window._cubeAudioCtx.destination);
 
             window._cubeMusicGain = window._cubeAudioCtx.createGain();
             window._cubeMusicGain.gain.value = window.musicVolume !== undefined ? window.musicVolume : 0.5;
-            window._cubeMusicGain.connect(window._cubeMasterGain);
+            window._cubeMusicGain.connect(window._cubeAudioCtx.destination);
         }
         ctx = window._cubeAudioCtx;
         masterGain = window._cubeMasterGain;
@@ -3181,6 +3247,13 @@ uniform float uDim;
     let starOutlineMat = null;
     const starGlowEl = document.getElementById('star-glow');
     let lunge = null;       // {t, dur, dir, amp} — the solid shoved at the camera, springing back
+    // Dynamic internal glow: a single PointLight at the object centre that intensifies
+    // as chunks are removed, simulating light escaping from the breaking solid. Updated
+    // only when chunk count changes (not every frame) for zero per-frame cost.
+    let totalChunkCount = 0;
+    let coreGlowLight = null;
+    let lastAliveCount = -1; // cached to avoid redundant intensity updates
+    let coreGlowSurge = 0;  // 1→0 while a gem-reveal surge is fading
     let dusts = [];         // {points, vels, life}
     let cubeDusts = [];     // {mesh, vel, ang, life, maxLife, startScale}
     const dustBoxGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
@@ -3415,7 +3488,6 @@ uniform float uDim;
         overlay: document.getElementById('overlay'),
         // NOTE: #strikeCount is re-created by applyTranslations() (it rewrites
         // winDesc.innerHTML), so it must be looked up fresh at use time — never cached here.
-        winTitle: document.getElementById('winTitle'),
         again: document.getElementById('again'),
     };
 
@@ -3431,7 +3503,6 @@ uniform float uDim;
     if (window.Game && window.Game.bus) {
         const b = window.Game.bus;
         b.subscribe('game:strike', (data) => updateLevelStrikeCounter(data && data.pop));
-        b.subscribe('vfx:vignette', (data) => triggerVignetteFlash(data && data.colorHex));
         b.subscribe('vfx:toast', (data) => showToolToast(typeof data === 'string' ? data : (data && data.key)));
         b.subscribe('game:hint', (data) => {
             if (data) setHint(data.key, data.repl, data.immediate);
@@ -3717,11 +3788,7 @@ uniform float uDim;
         for (const fl of activeFlashes) flashLightPool.push(fl.light);
         activeFlashes.length = 0;
 
-        if (plantedBomb) {
-            if (plantedBomb.mesh.parent) plantedBomb.mesh.parent.remove(plantedBomb.mesh);
-            plantedBomb.mat.dispose();
-            plantedBomb = null;
-        }
+        defusePlantedBomb();
         moltenQueue = [];
         moltenWounds = [];
         for (const tw of crustTweens) tw.chunk.crustTween = null;
@@ -3732,6 +3799,12 @@ uniform float uDim;
         disposeHoneyDrips();
         disposeGemRig();
         disposeBands();
+        // Dynamic internal glow: keep the light object alive (reused across levels)
+        // but reset its state so the next build() starts from scratch.
+        if (coreGlowLight) { coreGlowLight.intensity = 0; coreGlowLight.color.setHex(0xffffff); }
+        totalChunkCount = 0;
+        lastAliveCount = -1;
+        coreGlowSurge = 0;
         chainsBroken = false; chainGlow = 0;
         clearGemPings();
         chunks = []; treasures = []; debris = []; dusts = []; sparkles = []; collecting = [];
@@ -4830,7 +4903,6 @@ uniform float uDim;
         spawnShockwave(hitWorld, swing.n);
         flash(hitWorld);
         spawnImpactSparks(hitWorld, 16);
-        triggerVignetteFlash('215, 232, 255');
         const k = Math.min(rig.hits / BAND_HP, 1); // battered metal darkens
         rig.mat.color.setRGB(0.60 - k * 0.20, 0.64 - k * 0.22, 0.68 - k * 0.24);
         if (rig.hits >= BAND_HP) {
@@ -4972,7 +5044,7 @@ uniform float uDim;
         window.currentRank = null; // rated at the moment the third gem lands
         if (window.paintWinRank) window.paintWinRank();
         if (level === 0) {
-            window.hitsPerLevel = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            window.hitsPerLevel = Array(12).fill(null);
             if (interacted) {
                 bus('audio:play', { sfx: 'startOverJingle' });
             }
@@ -5406,6 +5478,19 @@ uniform float uDim;
             applyStarLight();
         }
 
+        // ---- dynamic internal glow ----
+        // A single PointLight at the object centre that intensifies as chunks are removed,
+        // simulating light escaping from the breaking solid. Colour matches the level's
+        // glow palette. Updated only when the alive count changes, not every frame.
+        totalChunkCount = chunks.length;
+        lastAliveCount = -1; // force first update
+        if (!coreGlowLight) {
+            coreGlowLight = new THREE.PointLight(0xffffff, 0, 3.5, 2);
+            cubeGroup.add(coreGlowLight);
+        }
+        coreGlowLight.color.setHex(glowFor(lvl));
+        coreGlowLight.intensity = 0; // starts invisible; ramps up as chunks break
+
         // Reset intro progress. Keep the interface out of the way for every level
         // until its shape has finished coalescing, so each trial opens on the solid.
         introProgress = 0.0;
@@ -5684,16 +5769,6 @@ uniform float uDim;
         }
     }
 
-    // Material-themed vignette tint for a plain hammer blow.
-    const VIGNETTE_FLASH = {
-        egg: '176, 240, 206', star: '206, 232, 255', ice: '144, 208, 255',
-        obsidian: '206, 158, 255', molten: '255, 150, 70', clockwork: '255, 214, 138',
-        petrified: '232, 176, 104', hive: '255, 208, 120', reliquary: '236, 216, 172',
-    };
-    function vignetteFlashColor() {
-        return VIGNETTE_FLASH[material] || (level === 2 ? '232, 175, 90' : '210, 190, 160');
-    }
-
     // Material-themed floating combat text for a plain blow. The second-strike specials
     // (ice shatter / obsidian splinter / bark peel) are overlaid by the caller, which
     // needs the struck chunk to decide them.
@@ -5784,6 +5859,13 @@ uniform float uDim;
             if (!t.exposed && t.chunk && !t.chunk.alive) {
                 t.exposed = true;
                 t.revealFlash = 1.0; // trigger the glow/scale pop flare
+                // Brief surge of the internal glow: when a gem is unearthed the core
+                // light floods the scene with the gem's colour for ~0.4 s.
+                if (coreGlowLight) {
+                    coreGlowLight.color.copy(t.sprite.material.color);
+                    coreGlowLight.intensity = Math.max(coreGlowLight.intensity, 3.0);
+                    coreGlowSurge = 1.0;
+                }
                 CubeCrackerAudio.reveal();
 
                 // Radiant burst of gem sparks on expose!
@@ -5834,6 +5916,22 @@ uniform float uDim;
         dirty = true;
     }
 
+    // Pull a live charge off the solid without setting it off, and drop any slow-mo it
+    // queued. The fuse burns in real time and used to outlive the win: the blast landed
+    // after completeLevel() had already banked the score, so it bumped `strikes` past
+    // the value that was saved and the win card reported a number the record never saw.
+    function defusePlantedBomb() {
+        clearTimeout(bombSlowTimer);
+        bombSlowTimer = 0;
+        targetTimeScale = 1.0;
+        const pb = plantedBomb;
+        if (!pb) return;
+        plantedBomb = null;
+        if (pb.mesh.parent) pb.mesh.parent.remove(pb.mesh);
+        pb.mat.dispose();
+        dirty = true;
+    }
+
     function updatePlantedBomb(dt) {
         const pb = plantedBomb;
         if (!pb) return;
@@ -5879,7 +5977,6 @@ uniform float uDim;
         spawnCubeDust(hitWorld, nWorld);
         spawnCubeDust(hitWorld, nWorld);
         spawnImpactSparks(hitWorld, 34);
-        triggerVignetteFlash(material === 'ice' ? '170, 220, 255' : '255, 158, 70');
         spawnJuiceText('BOOM!!!', hitWorld, '#ff9e46', '46px');
         wobbleAmp = 0.08 * MOTION;
         wobbleTime = 0;
@@ -6868,7 +6965,6 @@ uniform float uDim;
         wobbleTime = 0;
         chestJolt(0.55);
         spawnImpactSparks(hitWorld, 10);
-        triggerVignetteFlash('215, 232, 255');
         spawnJuiceText('CHAINS HOLD!', hitWorld, '#dbe7ff', '36px');
         setHint('reliquaryBlockedHint');
     }
@@ -6924,7 +7020,6 @@ uniform float uDim;
         spawnShockwave(hitWorld, swing.n);
         flash(hitWorld);
         spawnImpactSparks(hitWorld, 18);
-        triggerVignetteFlash('255, 224, 140');
         if (rig.hits >= LOCK_HP) {
             spawnJuiceText('LOCK BREAKS!!!', hitWorld, '#ffe08a', '46px');
             breakLock(rig, hitWorld);
@@ -6984,7 +7079,6 @@ uniform float uDim;
         wobbleTime = 0;
         chestJolt(1.0);
         spawnImpactSparks(hitWorld, 30);
-        triggerVignetteFlash('225, 236, 255');
         spawnJuiceText(last ? 'CHAINS SNAP!!!' : 'ONE LOCK LEFT!', hitWorld, '#e6f0ff', '46px');
         targetTimeScale = 0.35; // brief slow-mo so the chains read as they go
         clearTimeout(bombSlowTimer);
@@ -7110,10 +7204,6 @@ uniform float uDim;
         }
     }
 
-    function triggerVignetteFlash() {
-        // Screen flash on hit disabled
-    }
-
     const _sparkColor = new THREE.Color();
     function spawnImpactSparks(worldPos, count = 12) {
         count = tieredCount(count);
@@ -7183,7 +7273,16 @@ uniform float uDim;
 
     const _juicePool = [];
     const _juicePoolMax = 12;
-    function recycleJuiceEl(el) {
+    // Must match the animation durations in style.css. The timeout below is only a
+    // backstop for animationend, so it can never be SHORTER than the animation — a
+    // short one used to hide "SECRET RING!" a second early and park the still-running
+    // node back in the pool.
+    const JUICE_ANIM_MS = { 'secret-ring-text': 2400, 'unearthed-text': 1400, 'juice-text': 700 };
+    function recycleJuiceEl(el, gen) {
+        // Every hand-out bumps the node's generation. A backstop timer armed by an
+        // earlier use must not recycle a node that has since been handed out again:
+        // that parked a live text in the pool and let two callers animate one element.
+        if (gen !== undefined && gen !== el._juiceGen) return;
         if (_juicePool.includes(el)) return;
         if (_juicePool.length < _juicePoolMax) {
             el.style.display = 'none';
@@ -7196,12 +7295,15 @@ uniform float uDim;
         let el = _juicePool.pop();
         if (!el) {
             el = document.createElement('div');
-            el.addEventListener('animationend', () => recycleJuiceEl(el));
-            // class swaps restart the animation; a cancel must still recycle the node
-            el.addEventListener('animationcancel', () => recycleJuiceEl(el));
+            el._juiceGen = 0;
+            // Only animationend recycles. A cancel is always something we caused
+            // deliberately (hiding the node, or swapping classes to restart it), and
+            // recycling on it is what let a node be pooled while still in use.
+            el.addEventListener('animationend', () => recycleJuiceEl(el, el._juiceGen));
             el.style.display = 'none';
             document.body.appendChild(el);
         }
+        el._juiceGen++;
         return el;
     }
     function spawnJuiceText(text, worldPos, color = '#e8c98a', size = '32px') {
@@ -7210,11 +7312,13 @@ uniform float uDim;
         const x = (tempV.x * 0.5 + 0.5) * host.width + host.left;
         let y = (-tempV.y * 0.5 + 0.5) * host.height + host.top;
 
+        const variant = text === 'SECRET RING!' ? 'secret-ring-text'
+            : text === 'UNEARTHED!!!' ? 'unearthed-text' : 'juice-text';
         const el = _getJuiceEl();
         el.style.display = '';
-        if (text === 'UNEARTHED!!!' || text === 'SECRET RING!') {
+        if (variant !== 'juice-text') {
             y -= 30;
-            el.className = text === 'SECRET RING!' ? 'juice-text secret-ring-text' : 'juice-text unearthed-text';
+            el.className = 'juice-text ' + variant;
             el.style.color = '#ffffff';
             el.style.textShadow = `
                         0 0 6px #ffffff,
@@ -7232,7 +7336,11 @@ uniform float uDim;
         el.textContent = text;
         el.style.left = `${x}px`;
         el.style.top = `${y}px`;
-        el.style.fontSize = size;
+        // Sizes are authored against the same 1u = 16px base the stylesheet uses, so
+        // express them in --u rather than raw px — a fixed px size left the ordinary
+        // hit words stuck at desktop scale on small screens, while the UNEARTHED /
+        // SECRET RING variants kept scaling via their `!important` rules in style.css.
+        el.style.fontSize = `calc(var(--u) * ${parseFloat(size) || 32})`;
 
         const rotStart = (Math.random() * 2 - 1) * 20;
         const rotMid = rotStart * 0.4;
@@ -7244,15 +7352,12 @@ uniform float uDim;
         // restart animation by removing then re-adding the class
         el.classList.remove('juice-text', 'unearthed-text', 'secret-ring-text');
         void el.offsetWidth; // force reflow
-        if (text === 'SECRET RING!') {
-            el.classList.add('juice-text', 'secret-ring-text');
-        } else if (text === 'UNEARTHED!!!') {
-            el.classList.add('juice-text', 'unearthed-text');
-        } else {
-            el.classList.add('juice-text');
-        }
-        const timeoutMs = text === 'SECRET RING!' ? 1500 : (text === 'UNEARTHED!!!' ? 1600 : 800);
-        setTimeout(() => recycleJuiceEl(el), timeoutMs);
+        el.classList.add('juice-text');
+        if (variant !== 'juice-text') el.classList.add(variant);
+        // Backstop only: animationend normally does the recycling. Generation-guarded
+        // so this timer can never reclaim the node once it has been handed out again.
+        const gen = el._juiceGen;
+        setTimeout(() => recycleJuiceEl(el, gen), JUICE_ANIM_MS[variant] + 300);
     }
 
     const _dirtBaseColor = new THREE.Color();
@@ -7455,6 +7560,9 @@ uniform float uDim;
     // the final level). Kept out of updateCollecting() so the flight loop stays readable.
     function completeLevel() {
         gameOver = true;
+        // The last gem can be tapped while a charge is still ticking; the blast must not
+        // land after the score below has been banked.
+        defusePlantedBomb();
         setHint('');
         window.hitsPerLevel[level] = strikes;
         // bronze / silver / gold, from this level's gameConfig.starRanks thresholds
@@ -7541,7 +7649,7 @@ uniform float uDim;
     // The championship end card: counts the total hits up on a timer, then paints the
     // per-level scoreboard beneath it.
     function buildChampionshipScoreboard() {
-        const totalHits = window.hitsPerLevel.reduce((sum, h) => sum + h, 0);
+        const totalHits = window.runTotalHits();
         const totalHitsCount = document.getElementById('totalHitsCount');
 
         const spawnSparklesAround = (el) => {
@@ -7619,11 +7727,10 @@ uniform float uDim;
             LEVELS.forEach((lvl, idx) => {
                 const lvlNameKey = window.LEVEL_NAME_KEYS[idx] || 'stoneCube';
                 const localizedName = window._t ? window._t(lvlNameKey) : lvl.name;
-                const hitsFormatted = window._t('levelHitsLabel', { hits: window.hitsPerLevel[idx] });
 
                 const row = document.createElement('div');
                 row.className = 'level-stat-row';
-                row.innerHTML = `<span>${localizedName}</span><span style="font-family: monospace; color: var(--gold);">${hitsFormatted}${window.rankRowMarkup(idx, window.hitsPerLevel[idx])}</span>`;
+                row.innerHTML = `<span>${localizedName}</span>${window.hitsCellMarkup(idx)}`;
                 levelStatsContainer.appendChild(row);
             });
         }
@@ -8252,6 +8359,33 @@ uniform float uDim;
             r.mesh.scale.setScalar(1 + r.flash * 0.25);
         }
 
+        // ---- dynamic internal glow ----
+        // Update only when the alive count changes (chunks detached), not every frame.
+        if (coreGlowLight && totalChunkCount > 0) {
+            const alive = chunks.length;
+            if (alive !== lastAliveCount) {
+                lastAliveCount = alive;
+                const removed = totalChunkCount - alive;
+                // Ramp: 0 → 0.3 over the first 40% of chunks, then 0.3 → 2.5 over the rest.
+                // The early slow ramp means the first few strikes barely change the glow;
+                // once you're halfway through the solid the light surges.
+                const pct = removed / totalChunkCount;
+                const base = pct < 0.4
+                    ? pct * 0.75                        // 0 → 0.3
+                    : 0.3 + (pct - 0.4) * 3.666;      // 0.3 → 2.5
+                coreGlowLight.intensity = Math.min(base, 2.5);
+                dirty = true;
+            }
+            // Gem-reveal surge: the light floods the scene briefly, then fades
+            // back to the chunk-based intensity.
+            if (coreGlowSurge > 0) {
+                coreGlowSurge = Math.max(0, coreGlowSurge - scaledDt * 2.5);
+                // During the surge, override intensity with the surge value
+                coreGlowLight.intensity = Math.max(coreGlowLight.intensity, coreGlowSurge * 3.0);
+                dirty = true;
+            }
+        }
+
         // camera shake & kick
         if (kick > 0.001) {
             kick *= Math.exp(-dt * 10.0);
@@ -8286,13 +8420,11 @@ uniform float uDim;
     }
 
 
-    // Reset input state on blur or tab switch to prevent stuck dragging/striking
+    // Reset input state on blur or tab switch to prevent stuck dragging/striking.
+    // CubeCrackerResetInput is the canonical reset (it also clears activePointers and
+    // the pinch baseline), so just delegate — the copy that used to live here also
+    // assigned two variables that were never declared anywhere.
     const handleInputBlur = () => {
-        pointerDown = false;
-        dragTouchId = null;
-        currentPinchDist = 0;
-        spinX = 0;
-        spinY = 0;
         if (window.CubeCrackerResetInput) window.CubeCrackerResetInput();
     };
     window.addEventListener('blur', handleInputBlur);
@@ -8548,6 +8680,7 @@ uniform float uDim;
         tier: () => gpuTier(),
         alive: () => chunks.filter((c) => c.alive).length,
         state: () => ({ swing: !!swing, strikes, pointerDown, interacted }),
+        coreGlow: () => coreGlowLight ? { i: coreGlowLight.intensity.toFixed(3), c: coreGlowLight.color.getHexString(), s: coreGlowSurge } : null,
     };
 })();
 
