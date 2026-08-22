@@ -5199,7 +5199,7 @@ uniform float uDim;
                             : material === 'reliquary' ? 0.92 : 0.68;
 
         // pull the camera back for bigger solids so they still fill the frame
-        camBase.copy(CAM_HOME).multiplyScalar(lvl.cam || 1);
+        camBase.copy(CAM_HOME).multiplyScalar((lvl.cam || 1) * 1.06);
         camera.position.copy(camBase);
         camera.lookAt(CAM_LOOK);
 
@@ -6813,8 +6813,8 @@ uniform float uDim;
     // inversely proportional to its distance from the impact: pieces out at the rim of the
     // dent come back after EGG_HOLD_MIN, pieces right under the hammer take EGG_HOLD_MAX, so
     // the crater closes from the outside in and the hole at its centre is the last to seal.
-    const EGG_HOLD_MIN = 0.75;
-    const EGG_HOLD_MAX = 2.0;
+    const EGG_HOLD_MIN = 1.0;
+    const EGG_HOLD_MAX = 2.25;
     const EGG_REACH = 1.8; // dent radius, as a multiple of hitRadius
     function eggShrink(centerLocal, radius) {
         let first = null, firstK = -1;
