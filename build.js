@@ -39,19 +39,27 @@ const distDir = path.join(srcDir, 'dist');
 // Configuration
 // ---------------------------------------------------------------------------
 
-// Game scripts bundled into dist/game.js, in load order (relative to scripts/).
-// messagebus.js MUST come first: game.js reads window.Game.bus at init.
-const BUNDLED_SCRIPTS = ['messagebus.js', 'game.js'];
+const BUNDLED_SCRIPTS = [
+    'messagebus.js',
+    'i18n.js',
+    'ui.js',
+    'fracture.js',
+    'audio.js',
+    'game.js'
+];
+
+// Portal bridge scripts kept as their own <script> tags above the engine.
+const PLATFORM_SCRIPTS = ['platform/sdk-core.js', 'platform/platform-youtube.js'];
 
 // Scripts copied verbatim and kept as their own <script> tag. Only for
 // already-minified vendor libraries (re-minifying them is pointless).
 const EXTERNAL_LOCAL_SCRIPTS = ['three.min.js'];
 
 // Non-JS files copied verbatim into dist (relative to project root).
-const STATIC_ASSETS = ['style.css', 'config'];
+const STATIC_ASSETS = ['style.css', 'config', 'thumbnail.jpg'];
 
 // Directories copied wholesale into dist.
-const ASSET_DIRS = ['audio', 'sprites'];
+const ASSET_DIRS = ['audio', 'sprites', 'font', 'platform'];
 
 // Manifest that is the source of truth for runtime assets.
 const ASSET_MAP = 'asset_map';
@@ -266,7 +274,7 @@ function rewriteIndexHtml() {
     const htmlContent = fs.readFileSync(htmlSrc, 'utf8');
 
     // Expected local script order, normalized (strip './' and 'scripts/' prefix).
-    const expected = [...EXTERNAL_LOCAL_SCRIPTS, ...BUNDLED_SCRIPTS];
+    const expected = [...PLATFORM_SCRIPTS, ...EXTERNAL_LOCAL_SCRIPTS, ...BUNDLED_SCRIPTS];
 
     const localScriptRe = /<script\b[^>]*\bsrc="([^"]+\.js)"[^>]*><\/script>/g;
     const foundFiles = [];
