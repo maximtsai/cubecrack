@@ -179,10 +179,12 @@ const initOptions = () => {
     const newHapticsToggle = newOverlay.querySelector('#haptics-toggle');
     const hapticsStatus = newOverlay.querySelector('#haptics-status');
 
-    // Show haptics option only on mobile / vibration-capable devices
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || ('vibrate' in navigator);
+    // A desktop browser can expose a vibration API, but haptics remain a mobile-only setting.
+    const isMobile = navigator.userAgentData ? navigator.userAgentData.mobile :
+        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (hapticsRow) {
-        hapticsRow.style.display = isMobile ? 'flex' : 'none';
+        hapticsRow.style.display = isMobile && typeof navigator.vibrate === 'function' ? 'flex' : 'none';
     }
 
     if (newHapticsToggle) {
@@ -222,4 +224,3 @@ if (document.readyState === 'loading') {
     initOptions();
     initLevelSelect();
 }
-

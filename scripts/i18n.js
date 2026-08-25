@@ -1242,18 +1242,18 @@ window.ringsFound = Array(12).fill(false);
 // Star-rank thresholds, per level.
 window.gameConfig = {
     starRanks: [
-        { gold: 6,  silver: 10 },
-        { gold: 8,  silver: 12 },
-        { gold: 8,  silver: 14 },
+        { gold: 6, silver: 10 },
+        { gold: 8, silver: 12 },
+        { gold: 8, silver: 14 },
         { gold: 10, silver: 18 },
-        { gold: 8,  silver: 13 },
-        { gold: 8,  silver: 14 },
-        { gold: 6,  silver: 12 },
-        { gold: 8,  silver: 20 },
+        { gold: 8, silver: 13 },
+        { gold: 8, silver: 14 },
+        { gold: 6, silver: 12 },
+        { gold: 8, silver: 20 },
         { gold: 10, silver: 20 },
         { gold: 10, silver: 20 },
-        { gold: 7,  silver: 16 },
-        { gold: 5,  silver: 10 }
+        { gold: 7, silver: 16 },
+        { gold: 5, silver: 10 }
     ]
 };
 

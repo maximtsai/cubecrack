@@ -219,7 +219,7 @@
             // The context can be created long after the host reported its audio
             // state, so re-apply it to the fresh nodes rather than trusting the
             // defaults above.
-            if (!hostAudioEnabled) {
+            if (!hostAudioEnabled || document.hidden) {
                 window._cubeMasterGain.gain.value = 0;
                 window._cubeMusicGain.gain.value = 0;
             }
@@ -245,8 +245,9 @@
     // control the platform requires the game to honour. Direct assignment takes
     // effect at once and reads back, so the host-mute state is verifiable.
     function applyGains() {
-        if (masterGain) masterGain.gain.value = hostAudioEnabled ? window.masterVolume : 0;
-        if (musicGain) musicGain.gain.value = hostAudioEnabled ? window.musicVolume : 0;
+        const audible = hostAudioEnabled && !document.hidden;
+        if (masterGain) masterGain.gain.value = audible ? window.masterVolume : 0;
+        if (musicGain) musicGain.gain.value = audible ? window.musicVolume : 0;
     }
 
     // Called from the portal bridge with the host's initial state and on every
@@ -625,6 +626,14 @@
         if (c.state === 'suspended') c.resume().catch(() => { });
     }
 
+    // Portal pause signals are not guaranteed when a normal browser tab changes.
+    // Mute first so sounds triggered during the suspend transition cannot leak out.
+    document.addEventListener('visibilitychange', () => {
+        applyGains();
+        if (document.hidden) pauseForVisibility();
+        else resumeFromVisibility();
+    });
+
 
     // Message Bus integration for Audio
     if (window.Game && window.Game.bus) {
@@ -656,4 +665,3 @@
 
     window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
 })();
-
