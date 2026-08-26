@@ -52,9 +52,9 @@
         {
             shape: 'heart', colors: ICE, name: 'FROZEN HEART', won: 'HEART SHATTERED', break: 'ice', rough: 0.5, metal: 0.06, rods: 2,
             sizeMul: ICE_SIZE * 1.35 * 0.88 * 1.5 * ICE_GROW * 0.88, cam: ICE_SIZE * 0.75 * 1.5 * 1.15 * ICE_CAM * 0.84 * 0.95, chunkMul: 0.18 * 1.5 * 1.5 * 1.5 * ICE_GROW * ICE_GROW * ICE_GROW,
-            // Fixed anchors keep the three gems in separate lobes / lower point of the heart.
-            // Values are normalized to this shape's x/y/z bounds, so they scale with the heart.
-            gemLayout: [[-0.44, 0.23, 0], [0.44, 0.23, 0], [0, -0.52, 0]],
+            // Fixed anchors keep the three gems in separate lobes / lower point of the heart,
+            // with generous 3D clearance from both the vertical and horizontal metal rods.
+            gemLayout: [[-0.44, 0.25, -0.15], [0.44, 0.25, -0.15], [0, -0.50, -0.40]],
             bg: 'radial-gradient(120% 90% at 50% 38%, #471a59 0%, #251138 55%, #13091e 100%)'
         },
         {
@@ -798,6 +798,21 @@ uniform float uDim;
     };
 
 
+    // Exactly one vibration per event. navigator.vibrate() REPLACES whatever is
+    // already running instead of queueing behind it, so a second call in the same
+    // frame silently discards the first — which is how every graded pattern below
+    // used to collapse into the same flat 14ms buzz on a phone. Route every haptic
+    // through here and fire it once, so an event's pattern is what the player feels.
+    //
+    // Two tick strengths, not four: a motor needs tens of ms to spin up, so anything
+    // under ~30ms lands as one indistinguishable tap and a 7ms grade between them is
+    // felt by nobody. 14 is an ordinary contact, 24 is metal refusing to break, and
+    // anything that wants to read as bigger uses a multi-pulse pattern instead.
+    function haptic(pattern) {
+        if (window.hapticsEnabled === false || !navigator.vibrate) return;
+        try { navigator.vibrate(pattern); } catch (e) { /* blocked in some iframes */ }
+    }
+
     // Helper for publishing to Message Bus
     const bus = (topic, ...args) => {
         if (window.Game && window.Game.bus) {
@@ -823,9 +838,7 @@ uniform float uDim;
             if (window.screenShakeEnabled !== false) {
                 shake = Math.max(shake, amp * MOTION);
             }
-            if (window.hapticsEnabled !== false && navigator.vibrate) {
-                try { navigator.vibrate(14); } catch (e) { }
-            }
+            haptic(14);
         });
     }
 
@@ -1111,7 +1124,8 @@ uniform float uDim;
         }
         if (any) {
             CubeCrackerAudio.chime(0);
-            shake = (window.screenShakeEnabled !== false) ? 0.05 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+            shake = (window.screenShakeEnabled !== false) ? 0.05 * MOTION : 0;
+            haptic(14);
             dirty = true;
         }
     }
@@ -1743,9 +1757,7 @@ uniform float uDim;
         CubeCrackerAudio.chime(1);
         spawnSparkleBurst(wp, new THREE.Color(0xffe6a8), 34);
         spawnJuiceText('GOLD RING BONUS!!!', wp, '#ffd166', '44px');
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate([18, 20, 44]); } catch (e) { }
-        }
+        haptic([18, 20, 44]);
         dirty = true;
     }
 
@@ -2346,10 +2358,8 @@ uniform float uDim;
         } else {
             CubeCrackerAudio.metalThud();
         }
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate(22); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.20 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic(24);
+        shake = (window.screenShakeEnabled !== false) ? 0.20 * MOTION : 0;
         kick = 0.09 * MOTION;
         wobbleAmp = 0.028 * MOTION;
         wobbleTime = 0;
@@ -2418,10 +2428,8 @@ uniform float uDim;
 
         CubeCrackerAudio.shatter();
         CubeCrackerAudio.chime(1);
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate([30, 24, 70]); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.34 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic([30, 24, 70]);
+        shake = (window.screenShakeEnabled !== false) ? 0.34 * MOTION : 0;
         kick = 0.18 * MOTION;
         spawnImpactSparks(wp, 24);
         dirty = true;
@@ -3183,12 +3191,8 @@ uniform float uDim;
         }
         // a metal band soaked the blow up: metal never shatters, it just buckles
         if (swing.band) { bandStrike(swing.band); return; }
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try {
-                navigator.vibrate(15);
-            } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.16 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic(14);
+        shake = (window.screenShakeEnabled !== false) ? 0.16 * MOTION : 0;
         kick = 0.08 * MOTION; // kick the camera back slightly on impact!
         // clockwork gears clank; honeycomb sounds bouncy; egg cracks shell; glassy/metal solids ring; rock and magma thud
         if (material === 'clockwork') {
@@ -3443,10 +3447,8 @@ uniform float uDim;
         window.strikes = strikes;
         bus('game:strike', { pop: true }); // the charge is a strike too — keep the HUD in sync
         if (strikes === 1) bus('audio:music:start');
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate([40, 30, 90]); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.44 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic([40, 30, 90]);
+        shake = (window.screenShakeEnabled !== false) ? 0.44 * MOTION : 0;
         kick = 0.24 * MOTION;
         CubeCrackerAudio.boom();
         if (material === 'hive') {
@@ -4475,10 +4477,8 @@ uniform float uDim;
         chainGlow = 1.0;
         applyChainGlow();
         CubeCrackerAudio.metalThud();
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate([12, 26, 12]); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.15 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic([12, 26, 12]);
+        shake = (window.screenShakeEnabled !== false) ? 0.15 * MOTION : 0;
         kick = 0.06 * MOTION;
         wobbleAmp = 0.03 * MOTION;
         wobbleTime = 0;
@@ -4527,10 +4527,8 @@ uniform float uDim;
         chainGlow = Math.max(chainGlow, 0.6);
         applyChainGlow();
         CubeCrackerAudio.metalThud();
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate(24); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.22 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic(24);
+        shake = (window.screenShakeEnabled !== false) ? 0.22 * MOTION : 0;
         kick = 0.10 * MOTION;
         wobbleAmp = 0.035 * MOTION;
         wobbleTime = 0;
@@ -4589,10 +4587,8 @@ uniform float uDim;
         if (last) chainsBroken = true;
         CubeCrackerAudio.shatter();
         CubeCrackerAudio.chime(2);
-        if (window.hapticsEnabled !== false && navigator.vibrate) {
-            try { navigator.vibrate([40, 30, 90]); } catch (e) { }
-        }
-        shake = (window.screenShakeEnabled !== false) ? 0.42 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+        haptic([40, 30, 90]);
+        shake = (window.screenShakeEnabled !== false) ? 0.42 * MOTION : 0;
         kick = 0.22 * MOTION;
         wobbleAmp = 0.08 * MOTION;
         wobbleTime = 0;
@@ -5713,7 +5709,12 @@ uniform float uDim;
                 lastEruptionSoundTime = now;
                 const eruptionVol = isRecent ? 0.3 : 1.0;
                 CubeCrackerAudio.thunk(false, eruptionVol);
-                if (window.screenShakeEnabled !== false) shake = Math.max(shake, 0.1 * MOTION); if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
+                if (window.screenShakeEnabled !== false) shake = Math.max(shake, 0.1 * MOTION);
+                // Eruptions cascade across consecutive frames, and each vibrate() call
+                // replaces the one before it — so buzzing per frame is not ten ticks,
+                // it is one unbroken buzz for the length of the chain. Ride the sound's
+                // own throttle: one tick when a cascade opens, silence while it runs.
+                if (!isRecent) haptic(14);
                 exposeGems();
                 flushMergedUpdates();
             }
