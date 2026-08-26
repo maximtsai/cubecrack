@@ -63,7 +63,6 @@ function currentSaveRecord() {
             musicVolume: window.musicVolume,
             screenShakeEnabled: window.screenShakeEnabled !== false,
             hapticsEnabled: window.hapticsEnabled !== false,
-            lang: window.currentLang,
         },
     };
 }
@@ -115,7 +114,6 @@ window.applySavedState = function (state) {
         window.musicVolume = vol(st.musicVolume, window.musicVolume);
         if (typeof st.screenShakeEnabled === 'boolean') window.screenShakeEnabled = st.screenShakeEnabled;
         if (typeof st.hapticsEnabled === 'boolean') window.hapticsEnabled = st.hapticsEnabled;
-        if (SETTINGS_LANGS.indexOf(st.lang) !== -1) window.currentLang = st.lang;
     }
 
     if (window.CubeCrackerAudio) {

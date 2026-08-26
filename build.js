@@ -145,6 +145,7 @@ function collectCopyOps() {
                 const full = path.join(d, entry.name);
                 if (entry.isDirectory()) walk(full);
                 else {
+                    if (entry.name.endsWith('.md') || entry.name.endsWith('.txt')) continue;
                     const rel = path.relative(srcDir, full).replace(/\\/g, '/');
                     add(rel, rel);
                 }

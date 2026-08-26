@@ -298,7 +298,7 @@
             // The context can be created long after the host reported its audio
             // state, so re-apply it to the fresh nodes rather than trusting the
             // defaults above.
-            if (!hostAudioEnabled || document.hidden) {
+            if (!hostAudioEnabled) {
                 window._cubeMasterGain.gain.value = 0;
                 window._cubeMusicGain.gain.value = 0;
             }
@@ -330,7 +330,7 @@
     let holdsMuted = false;
 
     function applyGains() {
-        const audible = hostAudioEnabled && !document.hidden && !holdsMuted;
+        const audible = hostAudioEnabled && !holdsMuted;
         if (masterGain) masterGain.gain.value = audible ? window.masterVolume : 0;
         if (musicGain) musicGain.gain.value = audible ? window.musicVolume : 0;
     }
@@ -826,8 +826,7 @@
     // already-suspended context, concludes it never suspended anything, and both
     // resumes then decline to undo it, leaving the game silent for the rest of the
     // session. Holds are keyed by name rather than counted so an unmatched resume
-    // (visibilitychange fires visible-side without a preceding hidden) is a no-op
-    // instead of driving a counter negative.
+    // is a no-op instead of driving a counter negative.
     //
     // A hold silences in two stages, neither of them immediate, because the most
     // common ad break by far is the one that never fills: it is requested, settles a
@@ -838,9 +837,6 @@
     // which is heard as a gap — so it waits considerably longer. Releasing every hold
     // inside a grace cancels that stage, and a break that never fills clears both
     // before either fires, leaving the audio untouched.
-    //
-    // Tab backgrounding does not rely on either timer: applyGains() reads
-    // document.hidden directly, so a hidden tab silences on the spot.
     const MUTE_GRACE_MS = 220;
     const SUSPEND_GRACE_MS = 900;
     let muteTimer = 0;
@@ -848,7 +844,7 @@
     let visibilityAudioSuspended = false;
 
     function pauseForVisibility(reason) {
-        audioHolds.add(reason || 'visibility');
+        audioHolds.add(reason || 'host');
 
         if (!muteTimer && !holdsMuted) {
             muteTimer = setTimeout(() => {
@@ -883,7 +879,7 @@
     });
 
     function resumeFromVisibility(reason) {
-        audioHolds.delete(reason || 'visibility');
+        audioHolds.delete(reason || 'host');
         if (audioHolds.size) return; // another pause source is still holding it down
         if (muteTimer) { clearTimeout(muteTimer); muteTimer = 0; }
         if (suspendTimer) { clearTimeout(suspendTimer); suspendTimer = 0; }
@@ -893,14 +889,6 @@
         visibilityAudioSuspended = false;
         if (c.state === 'suspended') c.resume().catch(() => { });
     }
-
-    // Portal pause signals are not guaranteed when a normal browser tab changes.
-    // Mute first so sounds triggered during the suspend transition cannot leak out.
-    document.addEventListener('visibilitychange', () => {
-        applyGains();
-        if (document.hidden) pauseForVisibility('visibility');
-        else resumeFromVisibility('visibility');
-    });
 
 
     // Message Bus integration for Audio

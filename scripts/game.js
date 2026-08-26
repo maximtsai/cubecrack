@@ -70,13 +70,13 @@
 
             sizeMul: 1.45, cam: 1.28, chunkMul: 0.8533, bg: 'radial-gradient(120% 90% at 50% 38%, #4a3a1c 0%, #241c0e 55%, #120e07 100%)'
         },
-        // `blocks: 4` embeds four solid metal cubes in the core, three of them shoved out far
+        // `blocks: 5` embeds five solid metal cubes in the core, four of them shoved out far
         // enough that a corner breaks the skin (see planEmbeddedBlocks) — those are visible and
-        // hittable from the first frame, while the fourth is sealed in and has to be dug out.
+        // hittable from the first frame, while the fifth is sealed in and has to be dug out.
         // Metal never shatters: each cube soaks up BAND_HP blows, then shears off in one piece.
         {
             shape: 'orb', colors: MAGMA, name: 'MOLTEN CORE', won: 'CORE QUENCHED', break: 'molten', rough: 0.62, metal: 0.14,
-            blocks: 4, blocksJut: 3, blockLayout: 'embedded',
+            blocks: 5, blocksJut: 4, blockLayout: 'embedded',
             sizeMul: 1.56, cam: 1.20, chunkMul: 2.59, bg: 'radial-gradient(120% 90% at 50% 38%, #5c1c0a 0%, #2c0d06 55%, #150503 100%)'
         },
         // Fossilized tree trunk: a stone-hard cylinder painted with concentric growth
@@ -3860,25 +3860,29 @@ uniform float uDim;
         }
     }
 
-    // Bleeding lava: a fixed pool of glowing beads drawn as ONE InstancedMesh, parented to
-    // the solid so the streams ride it as it's turned. A fresh wound claims a few free
-    // beads; each wells up at the crater's mouth, stretches, then runs down the rock and
-    // thins away, restarting for as long as its wound is still hot. Purely visual — nothing
-    // is allocated at runtime, every bead is recycled in place.
-    const LAVA_DROPS = 20;
-    const LAVA_PER_WOUND = 5;
+    // Bleeding lava: a fixed pool of glowing molten beads drawn as ONE InstancedMesh, parented to
+    // the solid so the streams ride it as it's turned. A fresh wound claims a few thick lobes;
+    // each wells up sluggishly at the crater's mouth, swells into a bulbous molten slug, then slowly
+    // oozes down the rock with heavy viscous drag, cooling from incandescent white-gold into dark crust.
+    const LAVA_DROPS = 24;
+    const LAVA_PER_WOUND = 3;
+    const _lavaHotColor = new THREE.Color(0xfff2ba);   // Incandescent molten core
+    const _lavaMidColor = new THREE.Color(0xff5500);   // Glowing fiery orange
+    const _lavaCoolColor = new THREE.Color(0x5c0901);  // Crusting dark crimson
+    const _lavaCurColor = new THREE.Color();
     function buildLavaStreams() {
         const mat = new THREE.MeshStandardMaterial({
-            color: 0xff5a16, emissive: 0xff3200, emissiveIntensity: 1.8,
-            roughness: 0.42, metalness: 0.0, transparent: true, opacity: 0.95,
+            color: 0xffffff, emissive: 0xff3b00, emissiveIntensity: 2.2,
+            roughness: 0.38, metalness: 0.05, transparent: true, opacity: 0.98,
             depthWrite: false,
         });
-        // very low poly: 5x3 segments -> ~30 tris per bead, faceted on purpose
-        const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 5, 3), mat, LAVA_DROPS);
+        // 8x6 sphere for rounded, organic, heavy molten blobs
+        const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), mat, LAVA_DROPS);
         mesh.frustumCulled = false;
+        mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(LAVA_DROPS * 3), 3);
         const drops = [];
         for (let i = 0; i < LAVA_DROPS; i++) {
-            drops.push({ live: false, wound: null, anchor: new V3(), t: 0, dur: 1, r: 0, run: 0 });
+            drops.push({ live: false, wound: null, anchor: new V3(), t: 0, dur: 1, r: 0, run: 0, wobblePhase: 0 });
         }
         cubeGroup.add(mesh);
         lavaRig = {
@@ -3892,14 +3896,21 @@ uniform float uDim;
         d.live = true;
         d.wound = w;
         d.t = 0;
-        d.dur = 0.85 + Math.random() * 0.9;
-        d.r = rig.R * (0.045 + Math.random() * 0.040);
-        d.run = rig.R * (0.45 + Math.random() * 0.95);
-        // sit at the mouth of the crater, scattered around its lip
-        d.anchor.copy(w.center).addScaledVector(w.n, rig.R * 0.10);
-        d.anchor.x += (Math.random() - 0.5) * rig.R * 0.30;
-        d.anchor.y += (Math.random() - 0.5) * rig.R * 0.22;
-        d.anchor.z += (Math.random() - 0.5) * rig.R * 0.30;
+        // 20% reduced duration (2.55s – 3.85s) for tighter oozing lifecycle
+        d.dur = 2.55 + Math.random() * 1.30;
+        // Smaller, refined molten lobes (50%–76% of base unit radius)
+        d.r = rig.R * (0.050 + Math.random() * 0.026);
+        d.run = rig.R * (0.30 + Math.random() * 0.40);
+        d.wobblePhase = Math.random() * Math.PI * 2;
+        // Spawn deeper inside the fracture cavity, closer to the central core
+        d.anchor.copy(w.center);
+        if (d.anchor.lengthSq() > 0.001) {
+            d.anchor.multiplyScalar(0.85); // biased inward towards the molten center
+        }
+        d.anchor.addScaledVector(w.n, -rig.R * 0.06);
+        d.anchor.x += (Math.random() - 0.5) * rig.R * 0.14;
+        d.anchor.y += (Math.random() - 0.5) * rig.R * 0.12;
+        d.anchor.z += (Math.random() - 0.5) * rig.R * 0.14;
     }
 
     function bleedWound(w) {
@@ -3927,12 +3938,12 @@ uniform float uDim;
             if (d.live) {
                 d.t += dt;
                 if (d.t >= d.dur) {
-                    // keep pouring while the wound is still molten, then dry up
+                    // Keep pouring while the wound is still molten, then dry up
                     if (d.wound && d.wound.heat > 0.10) startDrop(d, d.wound, rig);
                     else { d.live = false; d.wound = null; }
                 }
             }
-            if (!d.live) { // parked: scaled to nothing, draws no pixels
+            if (!d.live) { // Parked: scaled to nothing, draws no pixels
                 _lavaM.compose(_lavaP.set(0, 0, 0), _lavaQ, _lavaS.set(0, 0, 0));
                 rig.mesh.setMatrixAt(i, _lavaM);
                 continue;
@@ -3940,23 +3951,47 @@ uniform float uDim;
             live++;
             const u = d.t / d.dur;
             let r, sy, fall;
-            if (u < 0.30) {          // a bead welling up out of the wound
-                const k = u / 0.30;
-                r = d.r * k;
-                sy = r * (1 + k * 0.8);
-                fall = d.r * k * 0.5;
-            } else {                 // stretching, running down the rock, thinning away
-                const k = (u - 0.30) / 0.70;
-                r = d.r * Math.max(1 - k * 0.85, 0);
-                sy = d.r * (1.8 + k * 1.8) * Math.max(1 - k * k, 0);
-                fall = d.r * 0.5 + k * k * d.run;
+            if (u < 0.25) {
+                // Phase 1: Heavy molten bubble welling up out of the fissure
+                const k = u / 0.25;
+                const bulge = Math.sin(k * Math.PI * 0.5);
+                r = d.r * bulge;
+                sy = r * (0.95 + k * 0.35);
+                fall = d.r * k * 0.25;
+                // White-hot core cooling slightly to bright orange
+                _lavaCurColor.copy(_lavaHotColor).lerp(_lavaMidColor, k * 0.7);
+            } else {
+                // Phase 2: Thick viscous creep down the rock face
+                const k = (u - 0.25) / 0.75;
+                // Viscous resistance curve (creeping flow, not accelerating freefall)
+                const flow = Math.pow(k, 0.75);
+                // Heavy slug morphology: bulbous leading lobe that stays thick
+                const lobeSwell = 1.0 + 0.22 * Math.sin(k * Math.PI);
+                const massRetention = Math.max(1.0 - k * 0.30, 0.70);
+                const tailFade = 1.0 - Math.pow(k, 5.0); // Soft fade-out only at the very end
+                r = d.r * massRetention * lobeSwell * tailFade;
+                sy = d.r * (1.25 + (1.0 - k) * 0.65) * lobeSwell * tailFade;
+                fall = d.r * 0.25 + flow * d.run;
+                // Thermal gradient: transition to glowing fiery red then dark crusting crimson
+                if (k < 0.5) {
+                    _lavaCurColor.copy(_lavaMidColor).lerp(_lavaCoolColor, k * 1.6);
+                } else {
+                    _lavaCurColor.copy(_lavaCoolColor).multiplyScalar(1.0 - (k - 0.5) * 0.8);
+                }
             }
             _lavaP.copy(d.anchor);
             _lavaP.y -= fall;
+            // Subtle organic lateral meandering as it creeps down uneven rock
+            const crawl = Math.sin(d.wobblePhase + u * 3.5);
+            _lavaP.x += crawl * d.r * 0.22;
+            _lavaP.z += Math.cos(d.wobblePhase + u * 3.5) * d.r * 0.22;
+
             _lavaM.compose(_lavaP, _lavaQ, _lavaS.set(r, sy, r));
             rig.mesh.setMatrixAt(i, _lavaM);
+            rig.mesh.setColorAt(i, _lavaCurColor);
         }
         rig.mesh.instanceMatrix.needsUpdate = true;
+        if (rig.mesh.instanceColor) rig.mesh.instanceColor.needsUpdate = true;
         rig.live = live;
         dirty = true;
     }
@@ -6306,12 +6341,9 @@ uniform float uDim;
         // submission never reached the platform. Nothing to say for a new one.
         if (window.totalStars(window.bestScores) > 0) window.submitStarScore();
 
-        // Locale. An explicit choice the player saved outranks the host's, so only
-        // ask the platform when the record didn't carry one.
-        if (!(saved && saved.settings && saved.settings.lang)) {
-            const tag = await withTimeout(sdk.getLanguage(), 3000, 'en');
-            window.setGameLanguage(normalizeLocale(tag));
-        }
+        // Locale from the platform SDK (single source of truth per Playables requirements)
+        const tag = await withTimeout(sdk.getLanguage(), 3000, 'en');
+        window.setGameLanguage(normalizeLocale(tag));
 
         // Genuinely interactive AND showing the player's real data: dismiss the
         // platform's loading UI.

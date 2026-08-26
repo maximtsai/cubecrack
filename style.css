@@ -1234,7 +1234,7 @@ body.ad-active #options-btn {
     gap: calc(var(--u) * 7);
     width: 100%;
     min-height: calc(var(--u) * 116);
-    padding: calc(var(--u) * 12) calc(var(--u) * 10);
+    padding: calc(var(--u) * 6) calc(var(--u) * 10);
     background: rgba(0, 0, 0, 0.35);
     border: calc(var(--u) * 1) solid rgba(232, 201, 138, 0.4);
     border-radius: calc(var(--u) * 10);
