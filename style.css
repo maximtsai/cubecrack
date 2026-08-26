@@ -232,15 +232,25 @@ h1 {
     --slot-glow: rgba(200, 155, 255, 0.75);
 }
 
-/* Secret gold-ring badge: positioned beside the three gem slots rather than
+.slot-wrap:nth-child(4) {
+    --slot-color: #ff7ad9;
+    --slot-glow: rgba(255, 122, 217, 0.75);
+}
+
+.slot-wrap:nth-child(5) {
+    --slot-color: #8dff8a;
+    --slot-glow: rgba(141, 255, 138, 0.75);
+}
+
+/* Secret gold-ring badge: positioned beside the visible gem slots rather than
            participating in their flex layout. It still has a stable, measurable location
            while hidden, so the collected ring can fly precisely into it without creating
-           an empty fourth-slot gap or shifting the gem slots. */
+           an empty extra-slot gap or shifting the gem slots. */
 #ring-badge {
     position: absolute;
     top: calc(var(--u) * -1);
     left: calc(100% + calc(var(--u) * 34));
-    /* normal 24px slot gap + the old 10px ring offset */
+    /* normal slot gap + the old 10px ring offset */
     width: calc(var(--u) * 32);
     height: calc(var(--u) * 32);
     border-radius: 50%;
@@ -1065,8 +1075,8 @@ body.has-overlay #options-btn {
 .level-select-btn {
     position: fixed;
     /* Align with the Options control; the title's narrowed wrap-safe column stays clear. */
-    top: max(calc(var(--u) * 6), env(safe-area-inset-top));
-    left: max(calc(var(--u) * -14), env(safe-area-inset-left));
+    top: max(calc(var(--u) * -6), env(safe-area-inset-top));
+    left: max(calc(var(--u) * -26), env(safe-area-inset-left));
     height: calc(var(--u) * 132);
     min-width: calc(var(--u) * 132);
     padding: 0 calc(var(--u) * 38);
@@ -1190,8 +1200,8 @@ body.has-overlay #options-btn {
 /* Options Button */
 .options-btn {
     position: fixed;
-    top: max(calc(var(--u) * 24), env(safe-area-inset-top));
-    right: max(calc(var(--u) * 24), env(safe-area-inset-right));
+    top: max(calc(var(--u) * 12), env(safe-area-inset-top));
+    right: max(calc(var(--u) * 12), env(safe-area-inset-right));
     width: calc(var(--u) * 108);
     height: calc(var(--u) * 108);
     border-radius: 50%;
@@ -1203,7 +1213,7 @@ body.has-overlay #options-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding-bottom: calc(var(--u) * 9);
+    padding-bottom: calc(var(--u) * 13);
     padding-left: calc(var(--u) * 1);
     z-index: 99;
     pointer-events: auto;
@@ -1227,7 +1237,7 @@ body.intro-hide-ui #options-btn {
     height: calc(var(--u) * 66);
     border-radius: 50%;
     background: rgba(34, 29, 24, 0.65);
-    border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.5);
+    border: calc(var(--u) * 3) solid rgba(232, 201, 138, 0.5);
     box-shadow: 0 0 calc(var(--u) * 15) rgba(0, 0, 0, 0.5);
     transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
     pointer-events: none;

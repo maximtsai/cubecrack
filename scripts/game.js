@@ -11,7 +11,7 @@
         debrisGravity: 10.0,
     };
 
-    const GEM_COLORS = [0xffb45e, 0x6ee0ff, 0xc89bff];
+    const GEM_COLORS = [0xffb45e, 0x6ee0ff, 0xc89bff, 0xff7ad9, 0x8dff8a];
 
     // ---------- levels ----------
     // Same gameplay each level; only the solid's shape and rock colour change.
@@ -137,6 +137,16 @@
             sizeMul: 1.863, cam: 1.28, chunkMul: 2.0,
             gemLayout: [[-0.42, 0.30, 0.10], [0.44, -0.10, -0.20], [0.05, -0.52, 0.28]],
             bg: 'radial-gradient(120% 90% at 50% 38%, #123c33 0%, #0a2320 55%, #04100e 100%)'
+        },
+        // Great Cube: a cube 3x the Stone Cube's linear size, with a metal core and
+        // six smaller metal cubes visibly jutting through all six faces.
+        {
+            shape: 'cube', colors: STONE, name: 'GREAT CUBE', won: 'GREAT CUBE CRACKED',
+            sizeMul: 0.7225 * 3, cam: 0.68 * 3, chunkMul: 3.0, introDuration: 0.6, introDurationMax: 0.9,
+            blocks: 7, blockLayout: 'greatCube', noRing: true,
+            gemCount: 5,
+            gemLayout: [[-0.42, -0.42, -0.42], [0.42, -0.42, 0.42], [-0.42, 0.42, 0.42], [0.42, 0.42, -0.42], [0, 0, 0.45]],
+            bg: 'radial-gradient(120% 90% at 50% 38%, #51402e 0%, #2d2114 55%, #17100a 100%)'
         },
     ];
 
@@ -762,6 +772,7 @@ uniform float uDim;
 
     const hud = {
         slots: [...document.querySelectorAll('.slot')],
+        slotWraps: [...document.querySelectorAll('.slot-wrap')],
         hint: document.getElementById('hint'),
         overlay: document.getElementById('overlay'),
         // NOTE: #strikeCount is re-created by applyTranslations() (it rewrites
@@ -1106,7 +1117,8 @@ uniform float uDim;
                             : material === 'petrified' ? 'petrifiedHint'
                                 : material === 'hive' ? 'hiveHint'
                                     : material === 'reliquary' ? 'reliquaryHint'
-                                        : material === 'star' ? 'starHint'
+                                        : level === 12 ? 'greatCubeHint'
+                                            : material === 'star' ? 'starHint'
                                             : level === 0 ? 'dragHint'
                                                 : 'levelHint';
     }
@@ -1142,10 +1154,11 @@ uniform float uDim;
         return true;
     }
 
-    function randomTreasurePositions(shp) {
+    function randomTreasurePositions(shp, count = 3) {
         const b = shp.bound;
         const tb = { x: b.x * 0.6, y: b.y * 0.6, z: b.z * 0.6 };
         const minSep = Math.min(b.x, b.y, b.z) * 0.7;
+        const required = count;
         const sample = () => new V3(
             (Math.random() * 2 - 1) * tb.x,
             (Math.random() * 2 - 1) * tb.y,
@@ -1157,7 +1170,7 @@ uniform float uDim;
         // whose free volume is tight (e.g. the pyramid around its big centre block) still
         // ends up with gems that are modestly spread instead of clumped together. Only
         // once every spaced pass has failed do the guards themselves start coming off, and
-        // the very last pass exists purely so a level can never generate fewer than 3.
+        // the very last pass exists purely so a level can never generate fewer than requested.
         const passes = [];
         for (const f of [1, 0.8, 0.62, 0.48, 0.36]) passes.push({ ok: inBlocks, sep: minSep * f });
         passes.push({ ok: inBlocks, sep: 0 });
@@ -1170,12 +1183,12 @@ uniform float uDim;
         for (const pass of passes) {
             const pts = [];
             let guard = 0;
-            while (pts.length < 3 && guard++ < 6000) {
+            while (pts.length < count && guard++ < 6000) {
                 const p = sample();
                 if (!pass.ok(p)) continue;
                 if (pass.sep === 0 || pts.every((q) => q.distanceTo(p) > pass.sep)) pts.push(p);
             }
-            if (pts.length === 3) return pts;
+            if (pts.length === count) return pts;
             if (pts.length > best.length) best = pts; // keep the closest attempt as a floor
         }
         return best;
@@ -2053,6 +2066,21 @@ uniform float uDim;
         return plan;
     }
 
+    function planGreatCubeBlocks() {
+        const h = shape.bound.x;
+        const s = h * 0.23;
+        const face = h - s * 0.20;
+        return [
+            { x: 0, y: 0, z: 0, s, clear: 2.6 },
+            { x: face, y: 0, z: 0, s: s * 0.62, clear: 2.0 },
+            { x: -face, y: 0, z: 0, s: s * 0.62, clear: 2.0 },
+            { x: 0, y: face, z: 0, s: s * 0.62, clear: 2.0 },
+            { x: 0, y: -face, z: 0, s: s * 0.62, clear: 2.0 },
+            { x: 0, y: 0, z: face, s: s * 0.62, clear: 2.0 },
+            { x: 0, y: 0, z: -face, s: s * 0.62, clear: 2.0 },
+        ];
+    }
+
     function buildBlocks(plan) {
         for (const b of plan) {
             const s = b.s;
@@ -2314,11 +2342,15 @@ uniform float uDim;
         window.currentRank = null; // rated at the moment the third gem lands
         if (window.paintWinRank) window.paintWinRank();
         if (level === 0) {
-            window.hitsPerLevel = Array(12).fill(null);
+            window.hitsPerLevel = Array(13).fill(null);
             if (interacted) {
                 bus('audio:play', { sfx: 'startOverJingle' });
             }
         }
+        const visibleGemCount = (LEVELS[level] && LEVELS[level].gemCount) || 3;
+        hud.slotWraps.forEach((wrap, idx) => {
+            wrap.style.display = idx < visibleGemCount ? '' : 'none';
+        });
         hud.slots.forEach((s) => {
             s.classList.remove('lit');
             s.classList.remove('victory-bounce');
@@ -2358,7 +2390,8 @@ uniform float uDim;
         // below can refuse any spot occupied by one.
         blockPlan = !lvl.blocks ? []
             : lvl.blockLayout === 'embedded' ? planEmbeddedBlocks(lvl.blocks, lvl.blocksJut)
-                : planBlocks(lvl.blocks);
+                : lvl.blockLayout === 'greatCube' ? planGreatCubeBlocks()
+                    : planBlocks(lvl.blocks);
         material = lvl.break || 'rock';
         iceTaught = false;
         obsidianTaught = false;
@@ -2400,7 +2433,7 @@ uniform float uDim;
             // Pull the clumps a little toward the middle of the ball so they sit deeper
             // in the machinery (the shape is convex and contains the origin, so scaling
             // toward the centre can never push a clump outside it).
-            tPos = randomTreasurePositions(shape).map((p) => p.multiplyScalar(0.82));
+            tPos = randomTreasurePositions(shape, lvl.gemCount || 3).map((p) => p.multiplyScalar(0.82));
             ({ chunks: raw, treasureChunkIndex } = buildGearCluster(shape, chunkCount, tPos));
         } else if (lvl.build === 'chest') {
             // hollow chest: a one-cell-thick timber shell, slabs partitioning the cavity
@@ -2418,7 +2451,7 @@ uniform float uDim;
             for (let attempt = 0; attempt < 8; attempt++) {
                 tPos = fixedGemPositions
                     ? fixedGemPositions.map((p) => p.clone())
-                    : randomTreasurePositions(shape);
+                    : randomTreasurePositions(shape, lvl.gemCount || 3);
                 ({ chunks: raw, treasureChunkIndex } =
                     CubeCrackerFracture.generate(shape, chunkCount, tPos, Math.random, lvl.colors, fracOpts));
                 if (treasureChunkIndex.every((i) => i >= 0)) break;
@@ -2468,6 +2501,7 @@ uniform float uDim;
                 damaged: false,
                 vStart: vOff,
                 vCount: n,
+                introDelay: 0,
             });
             vOff += n;
         }
@@ -2764,9 +2798,20 @@ uniform float uDim;
         // Reset intro progress. Keep the interface out of the way for every level
         // until its shape has finished coalescing, so each trial opens on the solid.
         introProgress = 0.0;
+        const introDurationMin = lvl.introDuration || introDuration;
+        const introDurationMax = lvl.introDurationMax || introDurationMin;
+        if (lvl.introDurationMax) {
+            const maxRadius = Math.max(1e-6, ...chunks.map((c) => c.centroid.length()));
+            for (const c of chunks) {
+                const radialProgress = THREE.MathUtils.clamp(c.centroid.length() / maxRadius, 0, 1);
+                c.introDuration = introDurationMin + radialProgress * (introDurationMax - introDurationMin);
+            }
+        } else {
+            for (const c of chunks) c.introDuration = introDurationMin;
+        }
         document.body.classList.add('intro-hide-ui');
-        treasures = tPos.map((p, i) => makeTreasure(p, GEM_COLORS[i], chunks[treasureChunkIndex[i]] || null));
-        secretRing = createSecretRing(); // one hidden gold ring, sealed in its own chunk
+        treasures = tPos.map((p, i) => makeTreasure(p, GEM_COLORS[i % GEM_COLORS.length], chunks[treasureChunkIndex[i]] || null));
+        secretRing = lvl.noRing ? null : createSecretRing(); // optional hidden gold ring, sealed in its own chunk
 
         cubeGroup.position.set(0, 0, 0); // clear any leftover jolt lunge
         lunge = null;
@@ -4638,7 +4683,9 @@ uniform float uDim;
     function spawnHugeDirtCubes() {
         // mobile: fewer clouds, each a touch larger to compensate; weak GPUs get the leanest set
         const count = (tier.weak ? 15 : tier.mobile ? 20 : 30) + Math.floor(Math.random() * 10);
-        const sizeBoost = tier.mobile ? 1.12 : 1;
+        const sizeBoost = (tier.mobile ? 1.12 : 1) * (level === 12 ? 2 : 1);
+        const velocityBoost = level === 12 ? 1.65 : 1;
+        const spawnRadiusBoost = level === 12 ? 3 : 1;
         const lvl = LEVELS[level];
         if (lvl && lvl.colors) {
             _dirtBaseColor.setRGB(lvl.colors.outer[0], lvl.colors.outer[1], lvl.colors.outer[2]);
@@ -4657,7 +4704,7 @@ uniform float uDim;
 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(Math.random() * 2 - 1);
-            const r = 0.4 + Math.random() * 0.8;
+            const r = (0.4 + Math.random() * 0.8) * spawnRadiusBoost;
             _dirtSpawnPos.set(
                 Math.sin(phi) * Math.cos(theta) * r,
                 Math.sin(phi) * Math.sin(theta) * r,
@@ -4670,8 +4717,8 @@ uniform float uDim;
             item.mesh.scale.set(s, s, s);
             item.startScale = s;
 
-            item.vel.copy(_dirtSpawnPos).normalize().multiplyScalar(1.2 + Math.random() * 2.3);
-            item.vel.y += 0.3 + Math.random() * 0.9;
+            item.vel.copy(_dirtSpawnPos).normalize().multiplyScalar((1.2 + Math.random() * 2.3) * velocityBoost);
+            item.vel.y += (0.3 + Math.random() * 0.9) * velocityBoost;
 
             item.ang.set(
                 (Math.random() - 0.5) * 8,
@@ -4850,9 +4897,12 @@ uniform float uDim;
                 collecting.splice(i, 1);
                 hud.slots[c.idx].classList.add('lit');
                 collectedCount++;
-                if (collectedCount === 1) setHint('gemsRemain2');
-                if (collectedCount === 2) setHint('gemsRemain1');
-                if (collectedCount === 3) completeLevel();
+                const remaining = treasures.length - collectedCount;
+                if (remaining === 4) setHint('gemsRemain4');
+                if (remaining === 3) setHint('gemsRemain3');
+                if (remaining === 2) setHint('gemsRemain2');
+                if (remaining === 1) setHint('gemsRemain1');
+                if (remaining === 0) completeLevel();
             }
         }
     }
@@ -4882,21 +4932,14 @@ uniform float uDim;
         }
         if (window.applyTranslations) window.applyTranslations();
 
-        // Exaggerated victory bounce sequential animation!
-        setTimeout(() => {
-            hud.slots[0].classList.add('victory-bounce');
-            if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) window.CubeCrackerAudio.chime(0);
-        }, 50);
-
-        setTimeout(() => {
-            hud.slots[1].classList.add('victory-bounce');
-            if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) window.CubeCrackerAudio.chime(1);
-        }, 200);
-
-        setTimeout(() => {
-            hud.slots[2].classList.add('victory-bounce');
-            if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) window.CubeCrackerAudio.chime(2);
-        }, 350);
+        // Exaggerated victory bounce sequential animation for every gem slot.
+        hud.slots.forEach((slot, idx) => {
+            if (idx >= treasures.length) return;
+            setTimeout(() => {
+                slot.classList.add('victory-bounce');
+                if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) window.CubeCrackerAudio.chime(idx);
+            }, 50 + idx * 150);
+        });
 
         setTimeout(() => {
             if (window.applyTranslations) window.applyTranslations();
@@ -5352,22 +5395,30 @@ uniform float uDim;
 
         // Update intro animation - run at normal speed so it is crisp
         if (introProgress < 1.0) {
-            introProgress += dt / introDuration; // raw dt!
+            const lvl = LEVELS[level];
+            const introDurationForLevel = lvl.introDuration || introDuration;
+            const introDurationMaxForLevel = lvl.introDurationMax || introDurationForLevel;
+            introProgress += dt / introDurationMaxForLevel; // raw dt!
             let finished = false;
             if (introProgress >= 1.0) {
                 introProgress = 1.0;
                 finished = true;
             }
 
-            const t = quadEaseIn(introProgress);
             const maxSeparation = 15.0 * (LEVELS[level].sizeMul || 1);
             // Chunks share one buffer now, so the fly-in translates each chunk's slice
             // of it rather than moving a mesh. Written against the pristine base copy
             // so the last frame lands exactly on the assembled solid.
             const arr = mergedGeo.attributes.position.array;
-            const sep = maxSeparation * (1.0 - t);
+            const elapsed = introProgress * introDurationMaxForLevel;
             for (const c of chunks) {
                 if (!c.alive) continue;
+                const localProgress = THREE.MathUtils.clamp(
+                    elapsed / (c.introDuration || introDurationForLevel),
+                    0, 1
+                );
+                const t = quadEaseIn(localProgress);
+                const sep = maxSeparation * (1.0 - t);
                 const ox = c.separationDir.x * sep, oy = c.separationDir.y * sep, oz = c.separationDir.z * sep;
                 const end = (c.vStart + c.vCount) * 3;
                 for (let i = c.vStart * 3; i < end; i += 3) {
@@ -5767,6 +5818,66 @@ uniform float uDim;
     window._cubeDblClick = (e) => { if (e.cancelable) e.preventDefault(); };
     document.addEventListener('dblclick', window._cubeDblClick);
 
+    // Interstitials belong at level transitions, not during active play. The bridge
+    // resolves false on a missing, failed, skipped, or timed-out ad, so progression
+    // must continue in every case.
+    let levelTransitioning = false;
+    function showLevelInterstitial() {
+        const sdk = window.GameSDK;
+        if (!sdk || typeof sdk.showAd !== 'function' || typeof sdk.supports !== 'function' ||
+            !sdk.supports('interstitial')) {
+            return Promise.resolve(false);
+        }
+
+        let adPaused = false;
+        const resumeAfterAd = () => {
+            if (!adPaused) return;
+            adPaused = false;
+            if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
+                window.CubeCrackerAudio.resumeFromVisibility();
+            }
+            startLoop();
+        };
+        const pauseForAd = () => {
+            if (adPaused) return;
+            adPaused = true;
+            handleInputBlur();
+            if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
+                window.CubeCrackerAudio.pauseForVisibility();
+            }
+            stopLoop();
+        };
+
+        let request;
+        try {
+            request = sdk.showAd('midgame', {
+                onStarted: pauseForAd,
+                onFinished: resumeAfterAd,
+                onError: resumeAfterAd,
+            });
+        } catch (e) {
+            resumeAfterAd();
+            return Promise.resolve(false);
+        }
+        return Promise.resolve(request).then(
+            (shown) => { resumeAfterAd(); return shown === true; },
+            () => { resumeAfterAd(); return false; }
+        );
+    }
+
+    function goToLevelWithInterstitial(nextLevel) {
+        if (levelTransitioning) return;
+        levelTransitioning = true;
+        const loadNextLevel = () => {
+            level = nextLevel;
+            build();
+        };
+        showLevelInterstitial().then(loadNextLevel, loadNextLevel).then(
+            () => { requestAnimationFrame(() => { levelTransitioning = false; }); },
+            () => { requestAnimationFrame(() => { levelTransitioning = false; }); }
+        );
+    }
+
     // Handle the tap directly on pointerup rather than waiting for the browser to
     // synthesize a 'click' afterward — touch-to-click synthesis is the flaky link on
     // some mobile browsers/webviews (especially under touch-action:none ancestors),
@@ -5774,16 +5885,10 @@ uniform float uDim;
     // pointerup stops the trailing synthetic click so the handler only runs once;
     // 'click' is kept too so keyboard (Enter/Space) activation still works, since
     // that path fires click directly with no pointer events at all.
-    let advancing = false;
     function nextTrial(e) {
         if (e) e.preventDefault();
-        // pointerup + click both fire on mouse (preventDefault on pointerup does NOT
-        // cancel the trailing synthetic click), so guard against advancing twice.
-        if (advancing) return;
-        advancing = true;
-        level = (level + 1) % LEVELS.length;
-        build();
-        requestAnimationFrame(() => { advancing = false; });
+        const nextLevel = (level + 1) % LEVELS.length;
+        goToLevelWithInterstitial(nextLevel);
     }
     hud.again.addEventListener('pointerup', nextTrial);
     hud.again.addEventListener('click', nextTrial);
@@ -5791,8 +5896,7 @@ uniform float uDim;
     // Level select bridge (called by the LEVELS button overlay)
     window.CubeCrackerGoToLevel = (i) => {
         if (typeof i !== 'number' || i < 0 || i >= LEVELS.length) return;
-        level = i;
-        build();
+        goToLevelWithInterstitial(i);
     };
     const restartGameBtn = document.getElementById('restartGame');
     if (restartGameBtn) {

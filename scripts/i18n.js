@@ -33,8 +33,8 @@ window.screenShakeEnabled = true;
 // null = not played in this run. It has to be distinguishable from 0: a level left
 // at 0 rendered as "0 hits" with no star rating, which reads as a flawless clear
 // rather than one the player never reached.
-window.hitsPerLevel = Array(12).fill(null);
-window.bestScores = Array(12).fill(null);
+window.hitsPerLevel = Array(13).fill(null);
+window.bestScores = Array(13).fill(null);
 
 // ---------- saved state ----------
 // One record holds everything that outlives a session: per-level records, the
@@ -180,6 +180,11 @@ window.TRANSLATIONS = {
         starDarkHint: "the star shines when struck",
         dragonEgg: "DRAGON EGG",
         wonEggPlundered: "EGG PLUNDERED",
+        greatCube: "GREAT CUBE",
+        wonGreatCubeCracked: "GREAT CUBE CRACKED",
+        greatCubeHint: "five gems - uncover them all",
+        gemsRemain3: "three gems remain",
+        gemsRemain4: "four gems remain",
         eggHint: "Shell regenerates. Break quickly.",
         gemsClaimed: "all gems claimed in {strikes} strikes",
         nextTrial: "NEXT TRIAL",
@@ -265,6 +270,11 @@ window.TRANSLATIONS = {
         starDarkHint: "la estrella brilla al golpearla",
         dragonEgg: "HUEVO DE DRAGÓN",
         wonEggPlundered: "HUEVO SAQUEADO",
+        greatCube: "GRAN CUBO",
+        wonGreatCubeCracked: "GRAN CUBO ROTO",
+        greatCubeHint: "cinco gemas - encuéntralas todas",
+        gemsRemain3: "quedan tres gemas",
+        gemsRemain4: "quedan cuatro gemas",
         eggHint: "la cáscara se regenera. rompe rápido.",
         gemsClaimed: "todas las gemas obtenidas en {strikes} golpes",
         nextTrial: "SIGUIENTE PRUEBA",
@@ -350,6 +360,11 @@ window.TRANSLATIONS = {
         starDarkHint: "l'étoile brille quand on la frappe",
         dragonEgg: "ŒUF DE DRAGON",
         wonEggPlundered: "ŒUF PILLÉ",
+        greatCube: "GRAND CUBE",
+        wonGreatCubeCracked: "GRAND CUBE BRISÉ",
+        greatCubeHint: "cinq gemmes - découvrez-les toutes",
+        gemsRemain3: "trois gemmes restantes",
+        gemsRemain4: "quatre gemmes restantes",
         eggHint: "la coquille se régénère. brisez vite.",
         gemsClaimed: "toutes les gemmes récupérées en {strikes} coups",
         nextTrial: "PROCHAIN ESSAI",
@@ -435,6 +450,11 @@ window.TRANSLATIONS = {
         starDarkHint: "敲击时星辉会亮起",
         dragonEgg: "巨龙之卵",
         wonEggPlundered: "龙卵被夺",
+        greatCube: "巨大立方",
+        wonGreatCubeCracked: "巨大立方已破",
+        greatCubeHint: "五颗宝石 - 找到它们",
+        gemsRemain3: "还剩三颗宝石",
+        gemsRemain4: "还剩四颗宝石",
         eggHint: "蛋壳会再生，快速破开",
         gemsClaimed: "集齐所有宝石，总共锤击 {strikes} 次",
         nextTrial: "下一关",
@@ -520,6 +540,11 @@ window.TRANSLATIONS = {
         starDarkHint: "敲擊時星輝會亮起",
         dragonEgg: "巨龍之卵",
         wonEggPlundered: "龍卵被奪",
+        greatCube: "巨大立方",
+        wonGreatCubeCracked: "巨大立方已破",
+        greatCubeHint: "五顆寶石 - 找到它們",
+        gemsRemain3: "還剩三顆寶石",
+        gemsRemain4: "還剩四顆寶石",
         eggHint: "蛋殼會再生，快速破開",
         gemsClaimed: "集齊所有寶石，總共錘擊 {strikes} 次",
         nextTrial: "下一關",
@@ -605,6 +630,11 @@ window.TRANSLATIONS = {
         starDarkHint: "يلمع النجم عند ضربه",
         dragonEgg: "بيضة التنين",
         wonEggPlundered: "تم سلب البيضة",
+        greatCube: "المكعب العظيم",
+        wonGreatCubeCracked: "تم كسر المكعب العظيم",
+        greatCubeHint: "خمس جواهر - اعثر عليها كلها",
+        gemsRemain3: "تبقى ثلاث جواهر",
+        gemsRemain4: "تبقى أربع جواهر",
         eggHint: "القشرة تتجدد. اكسرها بسرعة.",
         gemsClaimed: "تم جمع كل الجواهر في {strikes} ضربة",
         nextTrial: "التجربة التالية",
@@ -690,6 +720,11 @@ window.TRANSLATIONS = {
         starDarkHint: "प्रहार करने पर तारा चमकता है",
         dragonEgg: "ड्रैगन का अंडा",
         wonEggPlundered: "अंडा लूटा गया",
+        greatCube: "महान घन",
+        wonGreatCubeCracked: "महान घन टूट गया",
+        greatCubeHint: "पाँच रत्न - सभी को खोजें",
+        gemsRemain3: "तीन रत्न बाकी हैं",
+        gemsRemain4: "चार रत्न बाकी हैं",
         eggHint: "खोल फिर भर जाता है। जल्दी तोड़ें।",
         gemsClaimed: "सभी रत्न {strikes} प्रहारों में प्राप्त",
         nextTrial: "अगली चुनौती",
@@ -775,6 +810,11 @@ window.TRANSLATIONS = {
         starDarkHint: "星は叩くと輝く",
         dragonEgg: "ドラゴンの卵",
         wonEggPlundered: "卵強奪",
+        greatCube: "グレートキューブ",
+        wonGreatCubeCracked: "グレートキューブ破壊",
+        greatCubeHint: "宝石5個 - すべて見つけよう",
+        gemsRemain3: "宝石が3つ残っている",
+        gemsRemain4: "宝石が4つ残っている",
         eggHint: "殻は再生する。素早く壊そう。",
         gemsClaimed: "すべての宝石を{strikes}回の攻撃で獲得",
         nextTrial: "次の試練",
@@ -859,6 +899,11 @@ window.TRANSLATIONS = {
         starDarkHint: "звезда сияет от ударов",
         dragonEgg: "ЯЙЦО ДРАКОНА",
         wonEggPlundered: "ЯЙЦО РАЗГРАБЛЕНО",
+        greatCube: "ВЕЛИКИЙ КУБ",
+        wonGreatCubeCracked: "ВЕЛИКИЙ КУБ РАЗБИТ",
+        greatCubeHint: "пять самоцветов — найдите их все",
+        gemsRemain3: "осталось три самоцвета",
+        gemsRemain4: "осталось четыре самоцвета",
         eggHint: "скорлупа восстанавливается. Разбивайте быстро.",
         gemsClaimed: "все самоцветы получены за {strikes} ударов",
         nextTrial: "СЛЕДУЮЩЕЕ ИСПЫТАНИЕ",
@@ -913,12 +958,12 @@ window.I18N = Object.freeze({
     levelNameKeys: Object.freeze([
         'stoneCube', 'stonePillar', 'sandstonePyramid', 'iceHeart',
         'obsidianGeode', 'moltenCore', 'clockworkSphere', 'fossilizedTrunk',
-        'honeycombHive', 'chainReliquary', 'fallenStar', 'dragonEgg'
+        'honeycombHive', 'chainReliquary', 'fallenStar', 'dragonEgg', 'greatCube'
     ]),
     levelWinKeys: Object.freeze([
         'wonCubeCracked', 'wonPillarCracked', 'wonPyramidCracked', 'wonHeartShattered',
         'wonGeodeCracked', 'wonCoreQuenched', 'wonClockworkStopped', 'wonTrunkSplit',
-        'wonHiveBroken', 'wonReliquaryOpened', 'wonStarDimmed', 'wonEggPlundered'
+        'wonHiveBroken', 'wonReliquaryOpened', 'wonStarDimmed', 'wonEggPlundered', 'wonGreatCubeCracked'
     ])
 });
 window.I18N.keys = Object.freeze(Object.keys(window.TRANSLATIONS.en));
@@ -1237,7 +1282,7 @@ window.LEVEL_NAME_KEYS = window.I18N.levelNameKeys;
 
 
 
-window.ringsFound = Array(12).fill(false);
+window.ringsFound = Array(13).fill(false);
 
 // Star-rank thresholds, per level.
 window.gameConfig = {
@@ -1253,7 +1298,9 @@ window.gameConfig = {
         { gold: 10, silver: 20 },
         { gold: 10, silver: 20 },
         { gold: 7, silver: 16 },
-        { gold: 5, silver: 10 }
+        { gold: 5, silver: 10 },
+        { gold: 15, silver: 26 }
+
     ]
 };
 
