@@ -70,8 +70,13 @@ function currentSaveRecord() {
 window.persistGameState = function (opts) {
     const immediate = !!(opts && opts.immediate);
     // A write issued before the initial load would be overwritten by that load's
-    // merge a moment later, so hold everything until it has landed.
-    if (!saveLoaded && !immediate) return;
+    // merge a moment later, so hold everything until it has landed. The pause-time
+    // flush is held too, and it is the case that makes this a hard gate rather than
+    // an optimisation: the host can pause the game while the load is still in
+    // flight, and the record at that moment is all defaults. Writing it would put
+    // an empty save over real progress, which the load's merge only repairs if the
+    // player comes back. Nothing before the load is worth saving anyway.
+    if (!saveLoaded) return;
     clearTimeout(saveTimer);
     saveTimer = 0;
     const flush = () => {

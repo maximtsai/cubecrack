@@ -25,16 +25,20 @@
     }
 
 
-    // Hybrid decodeAudioData wrapper: supports modern Promise API & legacy callback-only Safari
+    // Hybrid decodeAudioData wrapper: supports modern Promise API & legacy callback-only Safari (§16)
     function decodeAudioDataSafe(audioCtx, arrayBuffer) {
         return new Promise((resolve, reject) => {
+            let isResolved = false;
+            const safeResolve = (buf) => { if (!isResolved) { isResolved = true; resolve(buf); } };
+            const safeReject = (err) => { if (!isResolved) { isResolved = true; reject(err); } };
+
             try {
-                const res = audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
+                const res = audioCtx.decodeAudioData(arrayBuffer, safeResolve, safeReject);
                 if (res && typeof res.then === 'function') {
-                    res.then(resolve).catch(reject);
+                    res.then(safeResolve, safeReject);
                 }
             } catch (err) {
-                reject(err);
+                safeReject(err);
             }
         });
     }

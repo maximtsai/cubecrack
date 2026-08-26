@@ -897,6 +897,7 @@ uniform float uDim;
         setAdInFlight(true);
         if (bombBtn) bombBtn.classList.add('pending');
 
+        let adResolved = false;
         const resumeAfterAd = () => {
             if (adPausedOwner !== 'rewarded') return;
             adPausedOwner = null;
@@ -917,10 +918,26 @@ uniform float uDim;
             stopLoop();
         };
 
+        // Safety fallback: unlock UI if platform SDK hangs or fails to respond within 10s (§13)
+        const adTimeout = setTimeout(() => {
+            if (adResolved) return;
+            adResolved = true;
+            resumeAfterAd();
+            setAdInFlight(false);
+            if (bombBtn) bombBtn.classList.remove('pending');
+            showToolToast('adUnavailable');
+        }, 10000);
+
         try {
             sdk.showAd('rewarded', {
-                onStarted: pauseForAd,
+                onStarted: () => {
+                    clearTimeout(adTimeout);
+                    pauseForAd();
+                },
                 onFinished: () => {
+                    clearTimeout(adTimeout);
+                    if (adResolved) return;
+                    adResolved = true;
                     resumeAfterAd();
                     setAdInFlight(false);
                     if (bombBtn) bombBtn.classList.remove('pending');
@@ -933,6 +950,9 @@ uniform float uDim;
                     showToolToast('bombToolName');
                 },
                 onError: () => {
+                    clearTimeout(adTimeout);
+                    if (adResolved) return;
+                    adResolved = true;
                     resumeAfterAd();
                     setAdInFlight(false);
                     if (bombBtn) bombBtn.classList.remove('pending');
@@ -940,10 +960,14 @@ uniform float uDim;
                 }
             }, 'refill-bomb-v1');
         } catch (e) {
-            resumeAfterAd();
-            setAdInFlight(false);
-            if (bombBtn) bombBtn.classList.remove('pending');
-            showToolToast('adUnavailable');
+            clearTimeout(adTimeout);
+            if (!adResolved) {
+                adResolved = true;
+                resumeAfterAd();
+                setAdInFlight(false);
+                if (bombBtn) bombBtn.classList.remove('pending');
+                showToolToast('adUnavailable');
+            }
         }
     }
 
@@ -5302,15 +5326,13 @@ uniform float uDim;
     el.addEventListener('contextmenu', (e) => e.preventDefault());
 
     function updatePointerCapture(e, capture) {
-        if (e.pointerType === 'mouse') {
-            try {
-                if (capture) {
-                    el.setPointerCapture(e.pointerId);
-                } else {
-                    el.releasePointerCapture(e.pointerId);
-                }
-            } catch (err) { }
-        }
+        try {
+            if (capture) {
+                el.setPointerCapture(e.pointerId);
+            } else if (el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) {
+                el.releasePointerCapture(e.pointerId);
+            }
+        } catch (err) { }
     }
 
     el.addEventListener('pointerdown', (e) => {
@@ -6064,24 +6086,46 @@ uniform float uDim;
         };
 
         return new Promise((resolve) => {
+            let adResolved = false;
+            const adTimeout = setTimeout(() => {
+                if (adResolved) return;
+                adResolved = true;
+                resumeAfterAd();
+                setAdInFlight(false);
+                resolve(false);
+            }, 10000);
+
             try {
                 sdk.showAd('midgame', {
-                    onStarted: pauseForAd,
+                    onStarted: () => {
+                        clearTimeout(adTimeout);
+                        pauseForAd();
+                    },
                     onFinished: () => {
+                        clearTimeout(adTimeout);
+                        if (adResolved) return;
+                        adResolved = true;
                         resumeAfterAd();
                         setAdInFlight(false);
                         resolve(true);
                     },
                     onError: () => {
+                        clearTimeout(adTimeout);
+                        if (adResolved) return;
+                        adResolved = true;
                         resumeAfterAd();
                         setAdInFlight(false);
                         resolve(false);
                     },
                 });
             } catch (e) {
-                resumeAfterAd();
-                setAdInFlight(false);
-                resolve(false);
+                clearTimeout(adTimeout);
+                if (!adResolved) {
+                    adResolved = true;
+                    resumeAfterAd();
+                    setAdInFlight(false);
+                    resolve(false);
+                }
             }
         });
     }
