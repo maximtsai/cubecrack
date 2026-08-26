@@ -311,7 +311,10 @@
         masterGain = window._cubeMasterGain;
         musicGain = window._cubeMusicGain;
 
-        if (autoResume && ctx.state === 'suspended') {
+        // 'interrupted' is Safari's: the OS took the audio hardware for a call or an
+        // alarm. Nothing in the game causes it and no host event announces it, so the
+        // next sound is what heals it.
+        if (autoResume && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
             ctx.resume().catch(() => { });
         }
         return ctx;
@@ -925,14 +928,6 @@
     }
 
 
-    // Auto-resume suspended AudioContext on window focus
-    window.addEventListener('focus', () => {
-        const c = ac(false);
-        if (c && (c.state === 'suspended' || c.state === 'interrupted')) {
-            c.resume().catch(() => { });
-        }
-    });
-
     function resumeFromVisibility(reason) {
         audioHolds.delete(reason || 'host');
         if (audioHolds.size) return; // another pause source is still holding it down
@@ -940,9 +935,16 @@
         if (suspendTimer) { clearTimeout(suspendTimer); suspendTimer = 0; }
         if (holdsMuted) { holdsMuted = false; applyGains(); }
         const c = window._cubeAudioCtx;
-        if (!visibilityAudioSuspended || !c) return;
+        if (!c) return;
+        const ours = visibilityAudioSuspended;
         visibilityAudioSuspended = false;
-        if (c.state === 'suspended') c.resume().catch(() => { });
+        // An interrupted context is healed whoever put it there, since no hold tracks
+        // an interruption. A suspended one only when the hold system was what suspended
+        // it: that state is also what a context waiting on its first gesture looks like,
+        // and resuming that from a host event would step around the browser's policy.
+        if (c.state === 'interrupted' || (ours && c.state === 'suspended')) {
+            c.resume().catch(() => { });
+        }
     }
 
 

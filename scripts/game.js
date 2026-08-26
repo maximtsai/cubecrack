@@ -26,7 +26,7 @@
     const GEM_WOOD = { outer: [0.31, 0.20, 0.13], inner: [0.56, 0.41, 0.25] };
     const STARLIGHT = { outer: [0.58, 0.68, 0.92], inner: [0.92, 0.96, 1.00] };
     const EGGSHELL = { outer: [0.15, 0.34, 0.28], inner: [0.86, 0.68, 0.26] };
-    const DIRT_BALL = { outer: [0.32, 0.22, 0.15], inner: [0.46, 0.33, 0.22] };
+    const GRANITE = { outer: [0.28, 0.275, 0.27], inner: [0.50, 0.49, 0.475] };
     const MOLTEN_GLOW = [1.0, 0.55, 0.16];   // heated-rock tint, just before it erupts
     // sizeMul: scales the shape's own half-extent before it's built (bigger solid).
     // cam:     camera distance multiplier (pull back so a bigger solid still fills
@@ -95,6 +95,16 @@
             shape: 'hive', colors: WAX, name: 'HONEYCOMB HIVE', won: 'HIVE BROKEN', break: 'hive', rough: 0.55, metal: 0.10,
             sizeMul: 1.34, cam: 1.18, chunkMul: 2.2, bg: 'radial-gradient(120% 90% at 50% 38%, #5c4413 0%, #2e2109 55%, #171004 100%)'
         },
+        // Quartz Cluster: an earthen dirt ball studded with multi-colored fragile quartz
+        // prisms jutting outward. A quartz prism is completely shattered on a direct hit or
+        // bomb blast, while surrounding dirt and adjacent crystals remain untouched.
+        {
+            shape: 'orb', colors: DIRT_BALL, name: 'QUARTZ CLUSTER', won: 'QUARTZ SHATTERED',
+            break: 'quartz', rough: 0.94, metal: 0.02,
+            quartzCount: 16,
+            sizeMul: 1.38, cam: 1.25, chunkMul: 2.2,
+            bg: 'radial-gradient(120% 90% at 50% 38%, #3e204c 0%, #200f28 55%, #0f0714 100%)'
+        },
         // Chain-bound chest: a plank-and-iron chest strapped shut with heavy chains and two
         // brass padlocks, each pinning one vertical strap and one horizontal girth band. The
         // timber is indestructible while it's bound — every blow that isn't on a padlock just
@@ -138,16 +148,6 @@
             sizeMul: 1.863, cam: 1.28, chunkMul: 2.0,
             gemLayout: [[-0.42, 0.30, 0.10], [0.44, -0.10, -0.20], [0.05, -0.52, 0.28]],
             bg: 'radial-gradient(120% 90% at 50% 38%, #123c33 0%, #0a2320 55%, #04100e 100%)'
-        },
-        // Quartz Cluster: an earthen dirt ball studded with multi-colored fragile quartz
-        // prisms jutting outward. A quartz prism is completely shattered on a direct hit or
-        // bomb blast, while surrounding dirt and adjacent crystals remain untouched.
-        {
-            shape: 'orb', colors: DIRT_BALL, name: 'QUARTZ CLUSTER', won: 'QUARTZ SHATTERED',
-            break: 'quartz', rough: 0.94, metal: 0.02,
-            quartzCount: 16,
-            sizeMul: 1.38, cam: 1.25, chunkMul: 2.2,
-            bg: 'radial-gradient(120% 90% at 50% 38%, #3e204c 0%, #200f28 55%, #0f0714 100%)'
         },
         // Great Cube: a cube 3x the Stone Cube's linear size, with a metal core and
         // six smaller metal cubes visibly jutting through all six faces.
@@ -2089,6 +2089,19 @@ uniform float uDim;
     }
 
     // ---------- quartz cluster: fragile multi-colored crystal prisms ----------
+    // A prism is a free dig, not an obstacle: shattering one clears the granite around its
+    // root. A line of small charges down the axis the crystal sat on rather than one sphere
+    // at the root, so what is left is a socket shaped like the thing pulled out of it.
+    //
+    // SEAT is the root's depth against the ball's radius, BORE_R the mouth against the
+    // charge's. Together ~11 chunks a crystal — the dial for how much of the level a player
+    // can skip by cashing in every one.
+    const QUARTZ_SEAT = 0.6;
+    // Doubly terminated, as a fraction of the tip's length: quartz grown free in a cavity
+    // comes to a point at both ends, and here the lower one is buried.
+    const QUARTZ_BUTT = 0.7;
+    const QUARTZ_BORE_STEPS = 4;
+    const QUARTZ_BORE_R = 0.42;
     let quartzRigs = [];
     const QUARTZ_COLORS = [
         { color: 0xc77dff, emissive: 0x9d4edd, name: 'AMETHYST' },
@@ -2114,6 +2127,8 @@ uniform float uDim;
             midPts.push(new V3(Math.cos(a) * radius, shaftLen, Math.sin(a) * radius));
         }
         const apex = new V3(0, shaftLen + tipLen, 0);
+        // Lower point, below the seat ring.
+        const root = new V3(0, -tipLen * QUARTZ_BUTT, 0);
 
         const v = (p, s) => {
             pos.push(p.x, p.y, p.z);
@@ -2131,6 +2146,13 @@ uniform float uDim;
             const s2 = 0.88 + (i % 3) * 0.12;
             v(midPts[i], s2); v(apex, s2); v(midPts[next], s2);
         }
+        // Lower termination. Opposite winding to the upper one, or the faces turn inside
+        // out and cull. Darker facets: this end shows only once its socket is opened.
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            const s3 = 0.70 + (i % 3) * 0.10;
+            v(bottomPts[next], s3); v(root, s3); v(bottomPts[i], s3);
+        }
 
         geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
         geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -2143,9 +2165,11 @@ uniform float uDim;
         const R = Math.min(shape.bound.x, shape.bound.y, shape.bound.z);
         const GOLD = Math.PI * (3 - Math.sqrt(5));
         const radius = R * 0.14;
-        const shaftLen = R * 0.58;
-        const tipLen = R * 0.32;
-        const totalLen = shaftLen + tipLen;
+        const shaftLen = R * 0.63;
+        const tipLen = R * 0.35;
+        const buttLen = tipLen * QUARTZ_BUTT;      // the buried point, below the seat ring
+        const totalLen = shaftLen + tipLen;        // seat ring upward — what stands proud
+        const fullLen = totalLen + buttLen;        // point to point
         const prismGeo = makeQuartzGeometry(radius, shaftLen, tipLen);
 
         for (let i = 0; i < n; i++) {
@@ -2169,8 +2193,9 @@ uniform float uDim;
             const a = i * GOLD + 0.5;
             const dir = new V3(Math.cos(a) * rr, yy, Math.sin(a) * rr).normalize();
 
-            // Anchor base at 88% of sphere radius (embedded in dirt)
-            const basePos = dir.clone().multiplyScalar(R * 0.88);
+            // Root sunk inside the shell, not resting on it: the crystal grew out of the
+            // ball, so most of the shaft belongs under the rock.
+            const basePos = dir.clone().multiplyScalar(R * QUARTZ_SEAT);
             mesh.position.copy(basePos);
 
             // Align crystal's Y axis with outward direction + slight organic tilt
@@ -2185,10 +2210,12 @@ uniform float uDim;
 
             // Invisible hit cylinder covering the prism
             const hit = new THREE.Mesh(
-                new THREE.CylinderGeometry(radius * 1.35, radius * 1.15, totalLen, 8, 1, false),
+                new THREE.CylinderGeometry(radius * 1.35, radius * 1.15, fullLen, 8, 1, false),
                 new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
             );
-            const hitPos = basePos.clone().addScaledVector(dir, totalLen * 0.5);
+            // Centre on the whole crystal so the buried point is tappable if a neighbour's
+            // socket uncovers it.
+            const hitPos = basePos.clone().addScaledVector(dir, (totalLen - buttLen) * 0.5);
             hit.position.copy(hitPos);
             hit.quaternion.copy(quat);
             hit.userData.kind = 'quartz';
@@ -2197,6 +2224,10 @@ uniform float uDim;
             const rig = {
                 mesh, mat, hit, geo: prismGeo,
                 home: hitPos.clone(), dir: dir.clone(),
+                // The blast is measured from the root, not from `home`: that sits half a
+                // prism out in the air, and cratering from there scrapes the shell.
+                base: basePos.clone(), radius, shaftLen, tipLen,
+                buried: R * (1 - QUARTZ_SEAT), // root to shell surface — the socket's length
                 color: qColor, pitchIndex: i,
             };
             hit.userData.quartz = rig;
@@ -2240,23 +2271,43 @@ uniform float uDim;
             window.CubeCrackerAudio.quartzChime(rig.pitchIndex);
         }
 
-        // Convert shattered quartz into 6 flying crystal shards
-        const shardGeo = new THREE.TetrahedronGeometry(0.18, 0);
-        for (let k = 0; k < 6; k++) {
-            const shardMesh = new THREE.Mesh(shardGeo, rig.mat.clone());
-            shardMesh.position.copy(wp);
-            shardMesh.position.x += (Math.random() - 0.5) * 0.2;
-            shardMesh.position.y += (Math.random() - 0.5) * 0.2;
-            shardMesh.position.z += (Math.random() - 0.5) * 0.2;
-            debrisGroup.add(shardMesh);
+        // Solid pieces, not grit: each is a smaller copy of the crystal's own profile, laid
+        // out along the shaft in descending size the way a prism snaps — the tip flies
+        // furthest, the stump at the root stays biggest.
+        //
+        // Each piece owns its geometry: debris expiry disposes geometry per mesh, so a
+        // shared one would be freed out from under the pieces still in flight.
+        const axisW = rig.dir.clone().applyQuaternion(cubeGroup.quaternion).normalize();
+        const totalLen = rig.shaftLen + rig.tipLen;
+        const PIECE_SCALES = [0.58, 0.46, 0.38, 0.30];
+        for (let k = 0; k < PIECE_SCALES.length; k++) {
+            const f = PIECE_SCALES[k] * (0.88 + Math.random() * 0.24);
+            // A snapped length is stubbier than the whole crystal: scaled straight down,
+            // the pieces read as splinters.
+            const pieceGeo = makeQuartzGeometry(rig.radius * (f + 0.34), rig.shaftLen * f, rig.tipLen * f);
+            // Tumble about its true middle — the piece runs from its own lower point up.
+            pieceGeo.translate(0, -(totalLen * f - rig.tipLen * f * QUARTZ_BUTT) * 0.5, 0);
+            const piece = new THREE.Mesh(pieceGeo, rig.mat.clone());
 
-            const outDir = rig.dir.clone().add(new V3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8)).normalize();
-            const vel = outDir.multiplyScalar(2.0 + Math.random() * 1.8);
-            vel.y += 0.8 + Math.random() * 0.8;
+            // Seat each piece where it broke from, walking out along the shaft.
+            const along = 0.18 + (k / PIECE_SCALES.length) * 0.78;
+            piece.position.copy(wp).addScaledVector(axisW, totalLen * along);
+            piece.position.x += (Math.random() - 0.5) * rig.radius;
+            piece.position.y += (Math.random() - 0.5) * rig.radius;
+            piece.position.z += (Math.random() - 0.5) * rig.radius;
+            piece.quaternion.setFromUnitVectors(new V3(0, 1, 0), axisW);
+            debrisGroup.add(piece);
+
+            // Heavier than grit: slower off the mark, lazier tumble, more push the further
+            // out the shaft it sat.
+            const outDir = axisW.clone().add(new V3(
+                (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.7, (Math.random() - 0.5) * 0.7)).normalize();
+            const vel = outDir.multiplyScalar((1.3 + along * 0.9) + Math.random() * 1.1);
+            vel.y += 0.5 + Math.random() * 0.6;
             debris.push({
-                mesh: shardMesh, vel,
-                ang: new V3((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12),
-                life: 0, maxLife: 1.4 + Math.random() * 0.6, own: true,
+                mesh: piece, vel,
+                ang: new V3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7),
+                life: 0, maxLife: 1.7 + Math.random() * 0.7, own: true,
             });
         }
 
@@ -2270,7 +2321,47 @@ uniform float uDim;
         spawnShockwave(wp, rig.dir);
         flash(wp);
         spawnJuiceText(rig.color.name + ' SHATTER!', wp, '#' + rig.color.color.toString(16).padStart(6, '0'), '42px');
+
+        // Measured from the root, so it makes no difference whether the blow landed on the
+        // tip or the shoulder. Never chains into a neighbour, or the cluster would unzip
+        // from one hit and leave no choice to make.
+        const mouthR = bombRadius * QUARTZ_BORE_R;
+        // Mouth at the shell surface, foot just below the root: the line spans what was
+        // buried.
+        const boreMouth = rig.base.clone().addScaledVector(rig.dir, rig.buried);
+        const boreFoot = rig.base.clone().addScaledVector(rig.dir, -mouthR * 0.9);
+        const boreAt = new V3();
+        const boreR = (t) => mouthR * (1 - t * 0.15); // barely narrows: a shaft, not a cone
+
+        // Gather first: detachChunk splices out of `chunks`. A Set because the spheres
+        // overlap by design and a chunk can sit in two of them.
+        const toDetach = new Set();
+        for (let step = 0; step < QUARTZ_BORE_STEPS; step++) {
+            const t = step / (QUARTZ_BORE_STEPS - 1);
+            boreAt.copy(boreMouth).lerp(boreFoot, t);
+            const r = boreR(t);
+            for (const c of chunks) {
+                if (!c.alive || toDetach.has(c)) continue;
+                if (c.centroid.distanceTo(boreAt) < r) toDetach.add(c);
+            }
+        }
+        // Blown from the foot, so spoil sprays out of the hole instead of deeper in.
+        const boreOriginW = cubeGroup.localToWorld(boreFoot.clone());
+        for (const c of toDetach) detachChunk(c, boreOriginW);
+
+        // Darken what lines the socket, so it reads as a wound not as missing chunks.
+        for (let step = 0; step < QUARTZ_BORE_STEPS; step++) {
+            const t = step / (QUARTZ_BORE_STEPS - 1);
+            boreAt.copy(boreMouth).lerp(boreFoot, t);
+            const r = boreR(t) * 1.6;
+            for (const c of chunks) {
+                if (!c.alive || c.centroid.distanceTo(boreAt) > r) continue;
+                scorchChunk(c, 0.88);
+            }
+        }
+
         exposeGems();
+        flushMergedUpdates();
         dirty = true;
     }
 

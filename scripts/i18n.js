@@ -185,7 +185,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "EGG PLUNDERED",
         quartzCluster: "QUARTZ CLUSTER",
         wonQuartzShattered: "QUARTZ SHATTERED",
-        quartzHint: "quartz - fragile crystal prisms. Strike them directly to shatter them.",
+        quartzHint: "quartz - fragile crystal prisms. Shatters when struck.",
         greatCube: "GREAT CUBE",
         wonGreatCubeCracked: "GREAT CUBE CRACKED",
         greatCubeHint: "five gems - uncover them all",
@@ -279,7 +279,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "HUEVO SAQUEADO",
         quartzCluster: "RACIMO DE CUARZO",
         wonQuartzShattered: "CUARZO DESTROZADO",
-        quartzHint: "cuarzo - prismas de cristal frágiles. Golpéalos directamente para romperlos.",
+        quartzHint: "cuarzo - prismas de cristal frágiles. Se rompen al ser golpeados.",
         greatCube: "GRAN CUBO",
         wonGreatCubeCracked: "GRAN CUBO ROTO",
         greatCubeHint: "cinco gemas - encuéntralas todas",
@@ -373,7 +373,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "ŒUF PILLÉ",
         quartzCluster: "AMAS DE QUARTZ",
         wonQuartzShattered: "QUARTZ BRISÉ",
-        quartzHint: "quartz - prismes de cristal fragiles. Frappez-les directement pour les briser.",
+        quartzHint: "quartz - prismes de cristal fragiles. Se brisent quand on les frappe.",
         greatCube: "GRAND CUBE",
         wonGreatCubeCracked: "GRAND CUBE BRISÉ",
         greatCubeHint: "cinq gemmes - découvrez-les toutes",
@@ -467,7 +467,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "龙卵被夺",
         quartzCluster: "石英簇",
         wonQuartzShattered: "石英粉碎",
-        quartzHint: "石英 - 易碎的水晶棱柱。直接敲击将其粉碎。",
+        quartzHint: "石英 - 易碎的水晶棱柱。敲击即碎。",
         greatCube: "巨大立方",
         wonGreatCubeCracked: "巨大立方已破",
         greatCubeHint: "五颗宝石 - 找到它们",
@@ -561,7 +561,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "龍卵被奪",
         quartzCluster: "石英簇",
         wonQuartzShattered: "石英粉碎",
-        quartzHint: "石英 - 易碎的水晶棱柱。直接敲擊將其粉碎。",
+        quartzHint: "石英 - 易碎的水晶棱柱。敲擊即碎。",
         greatCube: "巨大立方",
         wonGreatCubeCracked: "巨大立方已破",
         greatCubeHint: "五顆寶石 - 找到它們",
@@ -655,7 +655,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "تم سلب البيضة",
         quartzCluster: "عنقود الكوارتز",
         wonQuartzShattered: "تحطم الكوارتز",
-        quartzHint: "الكوارتز - موشورات بلورية هشة. اضربها مباشرة لتحطيمها.",
+        quartzHint: "الكوارتز - موشورات بلورية هشة. تتحطم عند ضربها.",
         greatCube: "المكعب العظيم",
         wonGreatCubeCracked: "تم كسر المكعب العظيم",
         greatCubeHint: "خمس جواهر - اعثر عليها كلها",
@@ -749,7 +749,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "अंडा लूटा गया",
         quartzCluster: "क्वार्ट्ज समूह",
         wonQuartzShattered: "क्वार्ट्ज चकनाचूर",
-        quartzHint: "क्वार्ट्ज - नाजुक क्रिस्टल प्रिज्म। उन्हें चकनाचूर करने के लिए सीधे प्रहार करें।",
+        quartzHint: "क्वार्ट्ज - नाजुक क्रिस्टल प्रिज्म। प्रहार करने पर चकनाचूर हो जाते हैं।",
         greatCube: "महान घन",
         wonGreatCubeCracked: "महान घन टूट गया",
         greatCubeHint: "पाँच रत्न - सभी को खोजें",
@@ -843,7 +843,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "卵強奪",
         quartzCluster: "クォーツクラスター",
         wonQuartzShattered: "クォーツ粉砕",
-        quartzHint: "クォーツ - 壊れやすいクリスタル柱。直接叩いて粉砕しよう。",
+        quartzHint: "クォーツ - 壊れやすいクリスタル柱。叩くと砕ける。",
         greatCube: "グレートキューブ",
         wonGreatCubeCracked: "グレートキューブ破壊",
         greatCubeHint: "宝石5個 - すべて見つけよう",
@@ -936,7 +936,7 @@ window.TRANSLATIONS = {
         wonEggPlundered: "ЯЙЦО РАЗГРАБЛЕНО",
         quartzCluster: "КВАРЦЕВЫЙ КЛАСТЕР",
         wonQuartzShattered: "КВАРЦ РАЗБИТ",
-        quartzHint: "кварц - хрупкие кристаллы. Бейте прямо по ним, чтобы разбить.",
+        quartzHint: "кварц - хрупкие кристаллы. Рассыпаются от удара.",
         greatCube: "ВЕЛИКИЙ КУБ",
         wonGreatCubeCracked: "ВЕЛИКИЙ КУБ РАЗБИТ",
         greatCubeHint: "пять самоцветов — найдите их все",
@@ -997,12 +997,12 @@ window.I18N = Object.freeze({
     levelNameKeys: Object.freeze([
         'stoneCube', 'stonePillar', 'sandstonePyramid', 'iceHeart',
         'obsidianGeode', 'clockworkSphere', 'moltenCore', 'fossilizedTrunk',
-        'honeycombHive', 'chainReliquary', 'fallenStar', 'dragonEgg', 'quartzCluster', 'greatCube'
+        'honeycombHive', 'quartzCluster', 'chainReliquary', 'fallenStar', 'dragonEgg', 'greatCube'
     ]),
     levelWinKeys: Object.freeze([
         'wonCubeCracked', 'wonPillarCracked', 'wonPyramidCracked', 'wonHeartShattered',
         'wonGeodeCracked', 'wonClockworkStopped', 'wonCoreQuenched', 'wonTrunkSplit',
-        'wonHiveBroken', 'wonReliquaryOpened', 'wonStarDimmed', 'wonEggPlundered', 'wonQuartzShattered', 'wonGreatCubeCracked'
+        'wonHiveBroken', 'wonQuartzShattered', 'wonReliquaryOpened', 'wonStarDimmed', 'wonEggPlundered', 'wonGreatCubeCracked'
     ])
 });
 window.I18N.keys = Object.freeze(Object.keys(window.TRANSLATIONS.en));
@@ -1335,10 +1335,10 @@ window.gameConfig = {
         { gold: 8, silver: 14 },
         { gold: 8, silver: 20 },
         { gold: 10, silver: 20 },
+        { gold: 8, silver: 16 },
         { gold: 10, silver: 20 },
         { gold: 7, silver: 16 },
         { gold: 5, silver: 10 },
-        { gold: 8, silver: 16 },
         { gold: 15, silver: 26 }
     ]
 };
