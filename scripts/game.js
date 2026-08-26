@@ -26,6 +26,7 @@
     const GEM_WOOD = { outer: [0.31, 0.20, 0.13], inner: [0.56, 0.41, 0.25] };
     const STARLIGHT = { outer: [0.58, 0.68, 0.92], inner: [0.92, 0.96, 1.00] };
     const EGGSHELL = { outer: [0.15, 0.34, 0.28], inner: [0.86, 0.68, 0.26] };
+    const DIRT_BALL = { outer: [0.32, 0.22, 0.15], inner: [0.46, 0.33, 0.22] };
     const MOLTEN_GLOW = [1.0, 0.55, 0.16];   // heated-rock tint, just before it erupts
     // sizeMul: scales the shape's own half-extent before it's built (bigger solid).
     // cam:     camera distance multiplier (pull back so a bigger solid still fills
@@ -137,6 +138,16 @@
             sizeMul: 1.863, cam: 1.28, chunkMul: 2.0,
             gemLayout: [[-0.42, 0.30, 0.10], [0.44, -0.10, -0.20], [0.05, -0.52, 0.28]],
             bg: 'radial-gradient(120% 90% at 50% 38%, #123c33 0%, #0a2320 55%, #04100e 100%)'
+        },
+        // Quartz Cluster: an earthen dirt ball studded with multi-colored fragile quartz
+        // prisms jutting outward. A quartz prism is completely shattered on a direct hit or
+        // bomb blast, while surrounding dirt and adjacent crystals remain untouched.
+        {
+            shape: 'orb', colors: DIRT_BALL, name: 'QUARTZ CLUSTER', won: 'QUARTZ SHATTERED',
+            break: 'quartz', rough: 0.94, metal: 0.02,
+            quartzCount: 16,
+            sizeMul: 1.38, cam: 1.25, chunkMul: 2.2,
+            bg: 'radial-gradient(120% 90% at 50% 38%, #3e204c 0%, #200f28 55%, #0f0714 100%)'
         },
         // Great Cube: a cube 3x the Stone Cube's linear size, with a metal core and
         // six smaller metal cubes visibly jutting through all six faces.
@@ -1211,6 +1222,7 @@ uniform float uDim;
         disposeHoneyDrips();
         disposeGemRig();
         disposeBands();
+        disposeQuartz();
         // Dynamic internal glow: keep the light object alive (reused across levels)
         // but reset its state so the next build() starts from scratch.
         if (coreGlowLight) { coreGlowLight.intensity = 0; coreGlowLight.color.setHex(0xffffff); }
@@ -1241,10 +1253,11 @@ uniform float uDim;
                             : material === 'petrified' ? 'petrifiedHint'
                                 : material === 'hive' ? 'hiveHint'
                                     : material === 'reliquary' ? 'reliquaryHint'
-                                        : level === 12 ? 'greatCubeHint'
-                                            : material === 'star' ? 'starHint'
-                                                : level === 0 ? 'dragHint'
-                                                    : 'levelHint';
+                                        : material === 'quartz' ? 'quartzHint'
+                                            : level === 13 ? 'greatCubeHint'
+                                                : material === 'star' ? 'starHint'
+                                                    : level === 0 ? 'dragHint'
+                                                        : 'levelHint';
     }
 
     // A gem must sit at least this far inside every face so its encasing chunk is
@@ -2075,6 +2088,192 @@ uniform float uDim;
         bandRigs = [];
     }
 
+    // ---------- quartz cluster: fragile multi-colored crystal prisms ----------
+    let quartzRigs = [];
+    const QUARTZ_COLORS = [
+        { color: 0xc77dff, emissive: 0x9d4edd, name: 'AMETHYST' },
+        { color: 0xff8fab, emissive: 0xfb6f92, name: 'ROSE QUARTZ' },
+        { color: 0xffd166, emissive: 0xffb703, name: 'CITRINE' },
+        { color: 0x48cae4, emissive: 0x0096c7, name: 'AQUAMARINE' },
+        { color: 0x70e000, emissive: 0x38b000, name: 'PERIDOT' },
+        { color: 0xf72585, emissive: 0xb5179e, name: 'RUBELLITE' },
+        { color: 0xd8bbff, emissive: 0xb892ff, name: 'CRYSTAL' },
+    ];
+
+    function makeQuartzGeometry(radius, shaftLen, tipLen) {
+        const geo = new THREE.BufferGeometry();
+        const pos = [];
+        const col = [];
+        const sides = 6;
+        const step = (Math.PI * 2) / sides;
+        const bottomPts = [];
+        const midPts = [];
+        for (let i = 0; i < sides; i++) {
+            const a = i * step;
+            bottomPts.push(new V3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+            midPts.push(new V3(Math.cos(a) * radius, shaftLen, Math.sin(a) * radius));
+        }
+        const apex = new V3(0, shaftLen + tipLen, 0);
+
+        const v = (p, s) => {
+            pos.push(p.x, p.y, p.z);
+            col.push(s, s, s);
+        };
+
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            const s1 = 0.80 + (i % 2) * 0.20;
+            v(bottomPts[i], s1); v(midPts[next], s1); v(bottomPts[next], s1);
+            v(bottomPts[i], s1); v(midPts[i], s1); v(midPts[next], s1);
+        }
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            const s2 = 0.88 + (i % 3) * 0.12;
+            v(midPts[i], s2); v(apex, s2); v(midPts[next], s2);
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        geo.computeVertexNormals();
+        return geo;
+    }
+
+    function buildQuartzPrisms(count) {
+        const n = Math.max(1, count | 0);
+        const R = Math.min(shape.bound.x, shape.bound.y, shape.bound.z);
+        const GOLD = Math.PI * (3 - Math.sqrt(5));
+        const radius = R * 0.14;
+        const shaftLen = R * 0.58;
+        const tipLen = R * 0.32;
+        const totalLen = shaftLen + tipLen;
+        const prismGeo = makeQuartzGeometry(radius, shaftLen, tipLen);
+
+        for (let i = 0; i < n; i++) {
+            const qColor = QUARTZ_COLORS[i % QUARTZ_COLORS.length];
+            const mat = new THREE.MeshStandardMaterial({
+                color: qColor.color,
+                emissive: qColor.emissive,
+                emissiveIntensity: 0.55,
+                roughness: 0.15,
+                metalness: 0.12,
+                transparent: true,
+                opacity: 0.94,
+                flatShading: true,
+            });
+
+            const mesh = new THREE.Mesh(prismGeo, mat);
+
+            // Fibonacci sphere placement
+            const yy = 1 - (2 * (i + 0.5)) / n;
+            const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
+            const a = i * GOLD + 0.5;
+            const dir = new V3(Math.cos(a) * rr, yy, Math.sin(a) * rr).normalize();
+
+            // Anchor base at 88% of sphere radius (embedded in dirt)
+            const basePos = dir.clone().multiplyScalar(R * 0.88);
+            mesh.position.copy(basePos);
+
+            // Align crystal's Y axis with outward direction + slight organic tilt
+            const quat = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), dir);
+            const tilt = new THREE.Quaternion().setFromAxisAngle(
+                new V3((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize(),
+                (Math.random() - 0.5) * 0.22
+            );
+            quat.multiply(tilt);
+            mesh.quaternion.copy(quat);
+            cubeGroup.add(mesh);
+
+            // Invisible hit cylinder covering the prism
+            const hit = new THREE.Mesh(
+                new THREE.CylinderGeometry(radius * 1.35, radius * 1.15, totalLen, 8, 1, false),
+                new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+            );
+            const hitPos = basePos.clone().addScaledVector(dir, totalLen * 0.5);
+            hit.position.copy(hitPos);
+            hit.quaternion.copy(quat);
+            hit.userData.kind = 'quartz';
+            cubeGroup.add(hit);
+
+            const rig = {
+                mesh, mat, hit, geo: prismGeo,
+                home: hitPos.clone(), dir: dir.clone(),
+                color: qColor, pitchIndex: i,
+            };
+            hit.userData.quartz = rig;
+            quartzRigs.push(rig);
+        }
+        setQuartzVisible(false);
+    }
+
+    function setQuartzVisible(v) {
+        for (const rig of quartzRigs) rig.mesh.visible = v;
+    }
+
+    function disposeQuartz() {
+        for (const rig of quartzRigs) {
+            if (rig.mesh.parent) rig.mesh.parent.remove(rig.mesh);
+            rig.geo.dispose();
+            rig.mat.dispose();
+            if (rig.hit.parent) rig.hit.parent.remove(rig.hit);
+            rig.hit.geometry.dispose();
+            rig.hit.material.dispose();
+        }
+        quartzRigs = [];
+    }
+
+    function shatterQuartz(rig, hitWorld) {
+        const i = quartzRigs.indexOf(rig);
+        if (i === -1) return;
+        quartzRigs.splice(i, 1);
+
+        cubeGroup.updateMatrixWorld(true);
+        const wp = new V3();
+        rig.mesh.getWorldPosition(wp);
+        cubeGroup.remove(rig.mesh);
+
+        if (rig.hit.parent) rig.hit.parent.remove(rig.hit);
+        rig.hit.geometry.dispose();
+        rig.hit.material.dispose();
+
+        // Synthesized pure musical crystalline bell sound - strictly NO MP3!
+        if (window.CubeCrackerAudio && window.CubeCrackerAudio.quartzChime) {
+            window.CubeCrackerAudio.quartzChime(rig.pitchIndex);
+        }
+
+        // Convert shattered quartz into 6 flying crystal shards
+        const shardGeo = new THREE.TetrahedronGeometry(0.18, 0);
+        for (let k = 0; k < 6; k++) {
+            const shardMesh = new THREE.Mesh(shardGeo, rig.mat.clone());
+            shardMesh.position.copy(wp);
+            shardMesh.position.x += (Math.random() - 0.5) * 0.2;
+            shardMesh.position.y += (Math.random() - 0.5) * 0.2;
+            shardMesh.position.z += (Math.random() - 0.5) * 0.2;
+            debrisGroup.add(shardMesh);
+
+            const outDir = rig.dir.clone().add(new V3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8)).normalize();
+            const vel = outDir.multiplyScalar(2.0 + Math.random() * 1.8);
+            vel.y += 0.8 + Math.random() * 0.8;
+            debris.push({
+                mesh: shardMesh, vel,
+                ang: new V3((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12),
+                life: 0, maxLife: 1.4 + Math.random() * 0.6, own: true,
+            });
+        }
+
+        haptic([18, 16, 42]);
+        shake = (window.screenShakeEnabled !== false) ? 0.22 * MOTION : 0;
+        kick = 0.12 * MOTION;
+        wobbleAmp = 0.04 * MOTION;
+        wobbleTime = 0;
+        spawnSparkleBurst(wp, rig.color.color, 26);
+        spawnImpactSparks(wp, 16);
+        spawnShockwave(wp, rig.dir);
+        flash(wp);
+        spawnJuiceText(rig.color.name + ' SHATTER!', wp, '#' + rig.color.color.toString(16).padStart(6, '0'), '42px');
+        exposeGems();
+        dirty = true;
+    }
+
     // ---------- sandstone pyramid: metal blocks buried in the stone ----------
     // Solid metal cubes sealed inside the pyramid, stacked up its axis and offset around it so
     // they sit in different pockets of stone. They're sized and placed so every corner stays
@@ -2505,7 +2704,7 @@ uniform float uDim;
         window.currentRank = null; // rated at the moment the third gem lands
         if (window.paintWinRank) window.paintWinRank();
         if (level === 0) {
-            window.hitsPerLevel = Array(13).fill(null);
+            window.hitsPerLevel = Array(LEVELS.length).fill(null);
             if (interacted) {
                 bus('audio:play', { sfx: 'startOverJingle' });
             }
@@ -2572,7 +2771,7 @@ uniform float uDim;
                 : material === 'ice' ? 0.90 : material === 'obsidian' ? 1.06
                     : material === 'molten' ? 1.15 : material === 'clockwork' ? 0.86
                         : material === 'petrified' ? 0.78 : material === 'hive' ? 0.82
-                            : material === 'reliquary' ? 0.92 : 0.68;
+                            : material === 'reliquary' ? 0.92 : material === 'quartz' ? 0.72 : 0.68;
 
         // pull the camera back for bigger solids so they still fill the frame
         camBase.copy(CAM_HOME).multiplyScalar((lvl.cam || 1) * 1.06);
@@ -2903,6 +3102,7 @@ uniform float uDim;
         if (lvl.blocks) buildBlocks(blockPlan); // solid metal cubes buried inside it
         if (lvl.rods) buildRods(lvl.rods); // long metal rods crossed and stabbed through it
         if (lvl.gear || lvl.build === 'gears') buildPoleGears(); // ticking metal gears at both poles
+        if (lvl.quartzCount) buildQuartzPrisms(lvl.quartzCount); // multi-colored fragile quartz prisms
         if (material === 'hive') buildHoneyDrips(); // purely decorative honey drips
         if (material === 'molten') buildLavaStreams(); // bleeding wounds pour lava down the rock
 
@@ -3191,6 +3391,12 @@ uniform float uDim;
         }
         // a metal band soaked the blow up: metal never shatters, it just buckles
         if (swing.band) { bandStrike(swing.band); return; }
+        // fragile quartz crystal prism: shatters instantly into musical crystal shards
+        if (swing.quartz) {
+            const hitWorld = cubeGroup.localToWorld(swing.hitLocal.clone());
+            shatterQuartz(swing.quartz, hitWorld);
+            return;
+        }
         haptic(14);
         shake = (window.screenShakeEnabled !== false) ? 0.16 * MOTION : 0;
         kick = 0.08 * MOTION; // kick the camera back slightly on impact!
@@ -3529,6 +3735,13 @@ uniform float uDim;
                     spawnJuiceText('METAL HOLDS!', hitWorld, '#dbe7ff', '36px');
                     setHint('metalHint');
                 }
+            }
+        }
+        // the explosion blast shatters all fragile quartz crystal prisms caught in its radius
+        for (const rig of quartzRigs.slice()) {
+            if (rig.home.distanceTo(hitLocal) < R * 1.35) {
+                const wp = cubeGroup.localToWorld(rig.home.clone());
+                shatterQuartz(rig, wp);
             }
         }
         // the hive only loses its innermost 70%; the rest of the blast just squashes wax
@@ -5521,6 +5734,7 @@ uniform float uDim;
         if (secretRing && secretRing.exposed && !secretRing.collected) targets.push(secretRing.hitMesh);
         for (const rig of lockRigs) targets.push(rig.hit); // the padlock models
         for (const rig of bandRigs) targets.push(rig.hit); // the metal bands
+        for (const rig of quartzRigs) targets.push(rig.hit); // fragile quartz crystal prisms
         if (solidMesh) targets.push(solidMesh);
         const hits = raycaster.intersectObjects(targets, false);
         const hit = hits.length ? hits[0] : null;
@@ -5536,7 +5750,7 @@ uniform float uDim;
             if (bombUsed) { showToolToast('bombSpent'); return; }
             if (swing || plantedBomb) return; // let the hammer / fuse finish first
             const kind = hit && hit.object.userData.kind;
-            if (kind !== 'chunk' && kind !== 'lock' && kind !== 'band') return;
+            if (kind !== 'chunk' && kind !== 'lock' && kind !== 'band' && kind !== 'quartz') return;
             _scratchNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
             plantBomb(hit.point.clone(), _scratchNormal.clone());
             return;
@@ -5548,7 +5762,7 @@ uniform float uDim;
         // buffer; find which chunk owns that triangle. Detached chunks are degenerate
         // and can't be hit, so a miss here means nothing strikeable was under the tap.
         const kind = hit.object.userData.kind;
-        const onRig = kind === 'lock' || kind === 'band'; // its own model, not a fracture chunk
+        const onRig = kind === 'lock' || kind === 'band' || kind === 'quartz'; // its own model, not a fracture chunk
         const hitChunk = onRig ? null : chunkAtVertex(hit.faceIndex * 3);
         if (!onRig && !hitChunk) return;
         _scratchNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
@@ -5559,6 +5773,7 @@ uniform float uDim;
         if (!swing) return;
         if (kind === 'lock') swing.lock = hit.object.userData.lock;
         else if (kind === 'band') swing.band = hit.object.userData.band;
+        else if (kind === 'quartz') swing.quartz = hit.object.userData.quartz;
     }
 
     // `chunks` stays sorted by vStart (build appends in order, detach only removes),
@@ -5637,6 +5852,7 @@ uniform float uDim;
                 document.body.classList.remove('intro-hide-ui'); // the UI fades back in
                 setGemRigVisible(true); // the lock and chains clamp on
                 setBandsVisible(true);    // the metal bands clamp on
+                setQuartzVisible(true);   // the quartz crystal prisms appear
             }
         }
 

@@ -528,6 +528,57 @@
         });
     }
 
+    const QUARTZ_SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.50, 1174.66, 1318.51, 1567.98]; // C5 to G6 pentatonic crystal chimes
+
+    function quartzChime(pitchIdx, volumeScale = 1.0) {
+        const c = ac(); if (!c) return;
+        const t = c.currentTime;
+        const vol = Math.max(0, typeof volumeScale === 'number' ? volumeScale : 1.0);
+        const idx = pitchIdx != null ? Math.abs(pitchIdx) : ((Math.random() * QUARTZ_SCALE.length) | 0);
+        const baseFreq = QUARTZ_SCALE[idx % QUARTZ_SCALE.length];
+
+        // 1. Primary pure crystal tone (sine + delicate bell decay)
+        const o1 = c.createOscillator();
+        o1.type = 'sine';
+        o1.frequency.setValueAtTime(baseFreq, t);
+        const g1 = c.createGain();
+        g1.gain.setValueAtTime(0.0001, t);
+        g1.gain.exponentialRampToValueAtTime(0.42 * vol, t + 0.005);
+        g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+        o1.connect(g1);
+        g1.connect(masterGain || c.destination);
+        o1.start(t);
+        o1.stop(t + 0.70);
+
+        // 2. High crystal overtone (2.756x inharmonic bell mode)
+        const o2 = c.createOscillator();
+        o2.type = 'sine';
+        o2.frequency.setValueAtTime(baseFreq * 2.756, t);
+        const g2 = c.createGain();
+        g2.gain.setValueAtTime(0.0001, t);
+        g2.gain.exponentialRampToValueAtTime(0.20 * vol, t + 0.003);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+        o2.connect(g2);
+        g2.connect(masterGain || c.destination);
+        o2.start(t);
+        o2.stop(t + 0.32);
+
+        // 3. Ultra-short crystal crackle snap transient (no MP3 sample)
+        const n = noise(c);
+        const f = c.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.setValueAtTime(3600, t);
+        const gn = c.createGain();
+        gn.gain.setValueAtTime(0.0001, t);
+        gn.gain.exponentialRampToValueAtTime(0.25 * vol, t + 0.002);
+        gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+        n.connect(f);
+        f.connect(gn);
+        gn.connect(masterGain || c.destination);
+        n.start(t);
+        n.stop(t + 0.05);
+    }
+
     async function loadBouncySound() {
         if (bouncyBuffer || bouncyLoading) return;
         bouncyLoading = true;
@@ -912,6 +963,7 @@
             else if (sfx === 'metalThud') metalThud();
             else if (sfx === 'boom') boom();
             else if (sfx === 'reveal') reveal();
+            else if (sfx === 'quartzChime') quartzChime(arg, vol !== undefined ? vol : 1.0);
             else if (sfx === 'chime') chime(arg !== undefined ? arg : 0);
             else if (sfx === 'win') win();
             else if (sfx === 'startOverJingle') startOverJingle();
@@ -928,5 +980,5 @@
         });
     }
 
-    window.CubeCrackerAudio = { thunk, gearClank, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, bouncy, eggCrack, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
+    window.CubeCrackerAudio = { thunk, gearClank, metalThud, shatter, quartzChime, boom, reveal, chime, win, startOverJingle, bounce, bouncy, eggCrack, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
 })();
