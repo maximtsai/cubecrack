@@ -763,6 +763,22 @@ uniform float uDim;
     let plantedBomb = null; // {mesh, mat, light, hitLocal, nLocal, t} — fuse burning
     let revealedOnce = false;
     let gameOver = false;
+    // Shared ad and host pause flags across interstitials and rewarded ads
+    let adPausedOwner = null; // null | 'interstitial' | 'rewarded'
+    let hostPaused = false;
+    let adInFlight = false;
+    function setAdInFlight(active) {
+        adInFlight = !!active;
+        if (active) {
+            document.body.classList.add('ad-active');
+            const opt = document.getElementById('options-overlay');
+            if (opt) opt.classList.remove('show');
+            const lvl = document.getElementById('level-overlay');
+            if (lvl) lvl.classList.remove('show');
+        } else {
+            document.body.classList.remove('ad-active');
+        }
+    }
     let zoomFactor = 1.0;
     const MIN_ZOOM = 0.65;
     const MAX_ZOOM = 1.1;
@@ -840,6 +856,10 @@ uniform float uDim;
             const showBomb = level >= 2; // explosive charge unlocks on level 3
             bombBtn.classList.toggle('hidden', !showBomb);
             bombBtn.classList.toggle('used', bombUsed);
+            // Play button icon badge at the corner once the free charge is spent, IF rewarded ads are supported
+            const supportsRewarded = !!(window.GameSDK && typeof window.GameSDK.supports === 'function' && window.GameSDK.supports('rewarded'));
+            const hasRewardAd = showBomb && bombUsed && supportsRewarded;
+            bombBtn.classList.toggle('has-ad-reward', hasRewardAd);
             if ((!showBomb || bombUsed) && currentTool === 'bomb') currentTool = 'hammer';
         }
         hammerBtn.classList.toggle('active', currentTool === 'hammer');
@@ -864,6 +884,68 @@ uniform float uDim;
         toolToastTimer = setTimeout(() => toolToast.classList.remove('show'), 1300);
     }
 
+    function claimRewardedBomb() {
+        const sdk = window.GameSDK;
+        if (!sdk || typeof sdk.showAd !== 'function' || typeof sdk.supports !== 'function' ||
+            !sdk.supports('rewarded')) {
+            showToolToast('bombSpent');
+            return;
+        }
+
+        if (adInFlight) return;
+        setAdInFlight(true);
+        if (bombBtn) bombBtn.classList.add('pending');
+
+        const resumeAfterAd = () => {
+            if (adPausedOwner !== 'rewarded') return;
+            adPausedOwner = null;
+            if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
+                window.CubeCrackerAudio.resumeFromVisibility('ad');
+            }
+            if (hostPaused) return;
+            startLoop();
+        };
+
+        const pauseForAd = () => {
+            if (adPausedOwner) return;
+            adPausedOwner = 'rewarded';
+            handleInputBlur();
+            if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
+                window.CubeCrackerAudio.pauseForVisibility('ad');
+            }
+            stopLoop();
+        };
+
+        try {
+            sdk.showAd('rewarded', {
+                onStarted: pauseForAd,
+                onFinished: () => {
+                    resumeAfterAd();
+                    setAdInFlight(false);
+                    if (bombBtn) bombBtn.classList.remove('pending');
+                    bombUsed = false;
+                    currentTool = 'bomb';
+                    refreshToolUI();
+                    if (window.CubeCrackerAudio && window.CubeCrackerAudio.chime) {
+                        window.CubeCrackerAudio.chime(1);
+                    }
+                    showToolToast('bombToolName');
+                },
+                onError: () => {
+                    resumeAfterAd();
+                    setAdInFlight(false);
+                    if (bombBtn) bombBtn.classList.remove('pending');
+                    showToolToast('adUnavailable');
+                }
+            }, 'refill-bomb-v1');
+        } catch (e) {
+            resumeAfterAd();
+            setAdInFlight(false);
+            if (bombBtn) bombBtn.classList.remove('pending');
+            showToolToast('adUnavailable');
+        }
+    }
+
     if (hammerBtn && scanBtn) {
         // onclick (not addEventListener) so a hot-reload of this script can't stack handlers
         hammerBtn.onclick = (e) => {
@@ -886,7 +968,10 @@ uniform float uDim;
             e.preventDefault(); e.stopPropagation();
             if (newToolTipBomb) newToolTipBomb.classList.remove('show');
             if (unlockTipTimer) { clearTimeout(unlockTipTimer); unlockTipTimer = null; }
-            if (bombUsed) { bus('vfx:toast', 'bombSpent'); return; } // one charge per level
+            if (bombUsed) {
+                claimRewardedBomb();
+                return;
+            }
             currentTool = 'bomb';
             refreshToolUI();
             showToolToast('bombToolName');
@@ -1724,10 +1809,9 @@ uniform float uDim;
         for (const sx of [-1, 1]) {
             add(new THREE.CylinderGeometry(st, st, bh * 0.52, 6), steel, sx * sr, bh * 0.20, 0); // shackle legs
         }
-        // invisible tap target: still thumb-friendly on a phone, but trimmed slightly so
-        // it hugs the brass more closely than it used to
+        // invisible tap target: slightly smaller than visual lock body to prevent accidental hits
         const hit = new THREE.Mesh(
-            new THREE.BoxGeometry(bw * 1.45, bh * 2.0, bd * 2.3),
+            new THREE.BoxGeometry(bw * 0.90, bh * 0.90, bd * 0.90),
             new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
         );
         hit.userData.kind = 'lock';
@@ -2094,10 +2178,9 @@ uniform float uDim;
             // at a slight angle (see planEmbeddedBlocks)
             if (b.rot) mesh.rotation.set(b.rot.x, b.rot.y, b.rot.z);
             cubeGroup.add(mesh);
-            // invisible tap target sitting over the block — a little snugger than before,
-            // so the metal reads the same size but is slightly harder to clip by accident
+            // invisible tap target sitting over the block — slightly smaller than visual block
             const hit = new THREE.Mesh(
-                new THREE.BoxGeometry(s * 2.3, s * 2.3, s * 2.3),
+                new THREE.BoxGeometry(s * 1.85, s * 1.85, s * 1.85),
                 new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
             );
             hit.position.copy(mesh.position);
@@ -2152,9 +2235,9 @@ uniform float uDim;
             mesh.quaternion.setFromEuler(cfg.rot);
             cubeGroup.add(mesh);
 
-            // invisible tap target sleeved over the rod
+            // invisible tap target sleeved over the rod — slightly smaller than visual rod
             const hit = new THREE.Mesh(
-                new THREE.CylinderGeometry(r * 2.8, r * 2.8, L, 10, 1, true),
+                new THREE.CylinderGeometry(r * 0.88, r * 0.88, L, 10, 1, true),
                 new THREE.MeshBasicMaterial({
                     transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
                 })
@@ -5828,8 +5911,6 @@ uniform float uDim;
     // resumes while the other still holds the game down, so a request that fails or
     // hits its watchdog behind a backgrounded host cannot restart the simulation (and
     // the music) under a host that believes the game is paused.
-    let adPaused = false;
-    let hostPaused = false;
     function showLevelInterstitial() {
         const sdk = window.GameSDK;
         if (!sdk || typeof sdk.showAd !== 'function' || typeof sdk.supports !== 'function' ||
@@ -5837,9 +5918,12 @@ uniform float uDim;
             return Promise.resolve(false);
         }
 
+        if (adInFlight) return Promise.resolve(false);
+        setAdInFlight(true);
+
         const resumeAfterAd = () => {
-            if (!adPaused) return;
-            adPaused = false;
+            if (adPausedOwner !== 'interstitial') return;
+            adPausedOwner = null;
             // Always released, even under a host pause — the audio layer holds the
             // context down for as long as the 'host' hold is outstanding.
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
@@ -5849,8 +5933,8 @@ uniform float uDim;
             startLoop();
         };
         const pauseForAd = () => {
-            if (adPaused) return;
-            adPaused = true;
+            if (adPausedOwner) return;
+            adPausedOwner = 'interstitial';
             handleInputBlur();
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
                 window.CubeCrackerAudio.pauseForVisibility('ad');
@@ -5858,25 +5942,31 @@ uniform float uDim;
             stopLoop();
         };
 
-        let request;
-        try {
-            request = sdk.showAd('midgame', {
-                onStarted: pauseForAd,
-                onFinished: resumeAfterAd,
-                onError: resumeAfterAd,
-            });
-        } catch (e) {
-            resumeAfterAd();
-            return Promise.resolve(false);
-        }
-        return Promise.resolve(request).then(
-            (shown) => { resumeAfterAd(); return shown === true; },
-            () => { resumeAfterAd(); return false; }
-        );
+        return new Promise((resolve) => {
+            try {
+                sdk.showAd('midgame', {
+                    onStarted: pauseForAd,
+                    onFinished: () => {
+                        resumeAfterAd();
+                        setAdInFlight(false);
+                        resolve(true);
+                    },
+                    onError: () => {
+                        resumeAfterAd();
+                        setAdInFlight(false);
+                        resolve(false);
+                    },
+                });
+            } catch (e) {
+                resumeAfterAd();
+                setAdInFlight(false);
+                resolve(false);
+            }
+        });
     }
 
     function goToLevelWithInterstitial(nextLevel) {
-        if (levelTransitioning) return;
+        if (levelTransitioning || adInFlight) return;
         levelTransitioning = true;
         const loadNextLevel = () => {
             level = nextLevel;
@@ -6035,7 +6125,7 @@ uniform float uDim;
         // An ad break outlives this signal on portals that resume the game the moment
         // the ad closes: leave the loop stopped and let the ad's own resume start it,
         // which is the path that also loads the next level.
-        if (adPaused) return;
+        if (adPausedOwner) return;
         startLoop();
     }
 

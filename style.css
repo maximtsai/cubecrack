@@ -443,6 +443,7 @@ h1 {
 }
 
 .tool-btn {
+    position: relative;
     width: calc(var(--u) * 118);
     height: calc(var(--u) * 118);
     border-radius: 50%;
@@ -516,12 +517,93 @@ h1 {
     display: none;
 }
 
-/* Spent explosive charge: still visible, but clearly unusable. */
+/* Spent explosive charge: still visible, but clearly unusable without reload */
 .tool-btn.used {
     opacity: 0.4;
     filter: grayscale(0.8);
     border-color: rgba(232, 201, 138, 0.22);
     box-shadow: none;
+}
+
+/* Rewarded ad badge on spent tool button corner */
+.tool-ad-badge {
+    position: absolute;
+    bottom: calc(var(--u) * -3);
+    right: calc(var(--u) * -3);
+    width: calc(var(--u) * 40);
+    height: calc(var(--u) * 40);
+    background: linear-gradient(135deg, #22c55e, #15803d);
+    border: calc(var(--u) * 2.5) solid #181512;
+    border-radius: calc(var(--u) * 10);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 calc(var(--u) * 3) calc(var(--u) * 8) rgba(0, 0, 0, 0.6), 0 0 calc(var(--u) * 10) rgba(34, 197, 94, 0.45);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.ad-play-icon {
+    width: calc(var(--u) * 27);
+    height: calc(var(--u) * 27);
+    fill: #ffffff;
+    transform: translateX(calc(var(--u) * 2));
+}
+
+@media (orientation: landscape) {
+    .tool-ad-badge {
+        width: calc(var(--u) * 32);
+        height: calc(var(--u) * 32);
+        bottom: calc(var(--u) * -2);
+        right: calc(var(--u) * -2);
+        border-radius: calc(var(--u) * 8);
+    }
+    .ad-play-icon {
+        width: calc(var(--u) * 21);
+        height: calc(var(--u) * 21);
+        transform: translateX(calc(var(--u) * 1.5));
+    }
+}
+
+.tool-btn.has-ad-reward .tool-ad-badge {
+    display: flex;
+    animation: adBadgePop 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes adBadgePop {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.tool-btn.used.has-ad-reward {
+    opacity: 0.85;
+    filter: none;
+    border-color: rgba(34, 197, 94, 0.55);
+    box-shadow: 0 0 calc(var(--u) * 12) rgba(34, 197, 94, 0.25);
+    cursor: pointer;
+}
+
+.tool-btn.used.has-ad-reward:hover {
+    opacity: 1;
+    border-color: rgba(34, 197, 94, 0.9);
+    box-shadow: 0 0 calc(var(--u) * 18) rgba(34, 197, 94, 0.45);
+}
+
+.tool-btn.pending {
+    pointer-events: none;
+    opacity: 0.6;
+    animation: toolBtnPendingPulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes toolBtnPendingPulse {
+    0% { transform: scale(0.96); opacity: 0.5; }
+    100% { transform: scale(1.02); opacity: 0.8; }
 }
 
 /* NEW TOOL tooltip - small bubble above a freshly unlocked tool button */
@@ -725,6 +807,16 @@ body.has-overlay #options-btn {
     transition: opacity 0.35s ease;
 }
 
+/* An ad break only has to keep taps out of a stopped game — the platform paints
+   over the whole frame, so there is nothing left to hide. Fading here would blank
+   the tool bar's own pending indicator for the entire wait, and a request that
+   never fills would flash the HUD out and back with nothing shown in between. */
+body.ad-active #hud,
+body.ad-active #level-select-btn,
+body.ad-active #options-btn {
+    pointer-events: none;
+}
+
 .card {
     text-align: center;
     display: flex;
@@ -822,11 +914,11 @@ body.has-overlay #options-btn {
 
 .win-star:nth-child(2).earned {
     animation: winStarPopCenter 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    animation-delay: 0.50s;
+    animation-delay: 0.45s;
 }
 
 .win-star:nth-child(3).earned {
-    animation-delay: 0.85s;
+    animation-delay: 0.75s;
 }
 
 @keyframes winStarIn {
