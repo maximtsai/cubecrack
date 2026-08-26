@@ -12,6 +12,10 @@
     let iceCounter = 0;
     let softBounceBuffer = null;
     let softBounceLoading = false;
+    let bouncyBuffer = null;
+    let bouncyLoading = false;
+    let eggBuffers = [null, null];
+    let eggLoading = false;
     let musicBuffer = null;
     let musicLoading = false;
     let musicSource = null;
@@ -95,6 +99,81 @@
         } finally {
             metalThudLoading = false;
         }
+    }
+
+    // Four crisp clockwork gear clanks; one is picked at random on gear strikes.
+    const GEAR_IDS = ['gear_1', 'gear_2', 'gear_3', 'gear_4'];
+    let gearBuffers = [null, null, null, null];
+    let gearLoading = false;
+
+    async function loadGearSounds() {
+        if (gearLoading) return;
+        gearLoading = true;
+        try {
+            const c = ac();
+            if (c) {
+                await Promise.all(GEAR_IDS.map(async (id, i) => {
+                    if (gearBuffers[i]) return;
+                    try {
+                        const resp = await fetch(getAssetUrl(id));
+                        const arrayBuffer = await resp.arrayBuffer();
+                        gearBuffers[i] = await decodeAudioDataSafe(c, arrayBuffer);
+                    } catch (e) {
+                        console.error('Error loading ' + id + ':', e);
+                    }
+                }));
+            }
+        } catch (e) {
+            console.error('Error in loadGearSounds:', e);
+        } finally {
+            gearLoading = false;
+        }
+    }
+
+    // A crisp, resonant clank for striking clockwork gears.
+    function gearClank(volumeScale = 1.0) {
+        const c = ac(); if (!c) return;
+        const t = c.currentTime;
+        const vol = Math.max(0, typeof volumeScale === 'number' ? volumeScale : 1.0);
+        const ready = gearBuffers.filter(Boolean);
+        if (ready.length) {
+            const buf = ready[(Math.random() * ready.length) | 0];
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            // slight detune so repeated blows never sound identical
+            if (src.detune && src.detune.setValueAtTime) {
+                src.detune.setValueAtTime((Math.random() * 2 - 1) * 140, t);
+            }
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.88 * vol, t);
+            src.connect(g);
+            g.connect(masterGain || c.destination);
+            src.start(t);
+            if (ready.length < GEAR_IDS.length) loadGearSounds();
+            return;
+        }
+        loadGearSounds();
+        // synth fallback: metallic ratchet/click
+        const o = c.createOscillator();
+        o.type = 'square';
+        o.frequency.setValueAtTime(650, t);
+        o.frequency.exponentialRampToValueAtTime(180, t + 0.06);
+        o.connect(env(c, 0.25 * vol, 0.08, t));
+        o.start(t); o.stop(t + 0.10);
+
+        const o2 = c.createOscillator();
+        o2.type = 'triangle';
+        o2.frequency.setValueAtTime(320, t);
+        o2.frequency.exponentialRampToValueAtTime(90, t + 0.12);
+        o2.connect(env(c, 0.45 * vol, 0.14, t));
+        o2.start(t); o2.stop(t + 0.16);
+
+        const n = noise(c);
+        const f = c.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.setValueAtTime(1800, t);
+        n.connect(f); f.connect(env(c, 0.35 * vol, 0.05, t));
+        n.start(t); n.stop(t + 0.08);
     }
 
     // A dull, dead clunk for hammer blows on metal bands, blocks, padlocks and chains.
@@ -244,8 +323,14 @@
     // muted right now?" unanswerable — which is a poor property for the one
     // control the platform requires the game to honour. Direct assignment takes
     // effect at once and reads back, so the host-mute state is verifiable.
+    // Named holds on the context, and whether they have gone as far as muting — see
+    // pauseForVisibility() below. Declared up here because applyGains() is the mute
+    // half of a hold and runs long before that code.
+    const audioHolds = new Set();
+    let holdsMuted = false;
+
     function applyGains() {
-        const audible = hostAudioEnabled && !document.hidden;
+        const audible = hostAudioEnabled && !document.hidden && !holdsMuted;
         if (masterGain) masterGain.gain.value = audible ? window.masterVolume : 0;
         if (musicGain) musicGain.gain.value = audible ? window.musicVolume : 0;
     }
@@ -287,21 +372,23 @@
         return g;
     }
 
-    function thunk(isIce = false) {
+    function thunk(isIce = false, volumeScale = 1.0, pitchOffset = 0) {
         const c = ac(); if (!c) return;
         const t = c.currentTime;
+        const vol = Math.max(0, typeof volumeScale === 'number' ? volumeScale : 1.0);
+        const pitch = typeof pitchOffset === 'number' ? pitchOffset : 0;
         if (isIce) {
             const bufferToPlay = (iceCounter % 2 === 0) ? iceBuffer : (iceBuffer2 || iceBuffer);
             iceCounter++;
             if (bufferToPlay) {
                 const src = c.createBufferSource();
                 src.buffer = bufferToPlay;
-                // Add random detune (±200 cents) for crystalline variety
+                // Add random detune (±200 cents) + pitchOffset for crystalline variety
                 if (src.detune && src.detune.setValueAtTime) {
-                    src.detune.setValueAtTime((Math.random() * 2 - 1) * 200, t);
+                    src.detune.setValueAtTime((Math.random() * 2 - 1) * 200 + pitch, t);
                 }
                 const g = c.createGain();
-                g.gain.setValueAtTime(0.75, t);
+                g.gain.setValueAtTime(0.75 * vol, t);
                 src.connect(g);
                 g.connect(masterGain || c.destination);
                 src.start(t);
@@ -313,12 +400,13 @@
                 frequencies.forEach((freq, idx) => {
                     const o = c.createOscillator();
                     o.type = 'sine';
-                    o.frequency.setValueAtTime(freq, t);
-                    o.frequency.linearRampToValueAtTime(freq * 0.95, t + 0.04);
+                    const fVal = freq * Math.pow(2, pitch / 1200);
+                    o.frequency.setValueAtTime(fVal, t);
+                    o.frequency.linearRampToValueAtTime(fVal * 0.95, t + 0.04);
 
                     // Very fast decay for icy crystal tines (0.04s - 0.12s)
                     const decay = 0.04 + (idx * 0.025);
-                    o.connect(env(c, 0.15 / (idx + 1), decay, t));
+                    o.connect(env(c, (0.15 / (idx + 1)) * vol, decay, t));
                     o.start(t);
                     o.stop(t + decay + 0.05);
                 });
@@ -336,32 +424,33 @@
         } else if (hammerBuffer) {
             const src = c.createBufferSource();
             src.buffer = hammerBuffer;
-            // Add random detune (±250 cents) for organic variety
+            // Add random detune (±250 cents) + pitchOffset for organic variety
             if (src.detune && src.detune.setValueAtTime) {
-                src.detune.setValueAtTime((Math.random() * 2 - 1) * 250, t);
+                src.detune.setValueAtTime((Math.random() * 2 - 1) * 250 + pitch, t);
             }
             const g = c.createGain();
-            g.gain.setValueAtTime(0.7, t);
+            g.gain.setValueAtTime(0.7 * vol, t);
             src.connect(g);
             g.connect(masterGain || c.destination);
             src.start(t);
         } else {
             loadHammerSound();
+            const pitchFactor = Math.pow(2, pitch / 1200);
             const detune = (Math.random() * 2 - 1) * 10; // small freq shift for synth fallback
             // Main punchy impact
             const o = c.createOscillator();
             o.type = 'triangle';
-            o.frequency.setValueAtTime(130 + detune, t);
-            o.frequency.exponentialRampToValueAtTime(38 + detune, t + 0.13);
-            o.connect(env(c, 0.7, 0.2, t));
+            o.frequency.setValueAtTime((130 + detune) * pitchFactor, t);
+            o.frequency.exponentialRampToValueAtTime((38 + detune) * pitchFactor, t + 0.13);
+            o.connect(env(c, 0.7 * vol, 0.2, t));
             o.start(t); o.stop(t + 0.25);
 
             // Low-end resonance (subtle boom)
             const o2 = c.createOscillator();
             o2.type = 'sine';
-            o2.frequency.setValueAtTime(75 + detune, t);
-            o2.frequency.exponentialRampToValueAtTime(30 + detune, t + 0.3);
-            o2.connect(env(c, 0.3, 0.5, t));
+            o2.frequency.setValueAtTime((75 + detune) * pitchFactor, t);
+            o2.frequency.exponentialRampToValueAtTime((30 + detune) * pitchFactor, t + 0.3);
+            o2.connect(env(c, 0.3 * vol, 0.5, t));
             o2.start(t); o2.stop(t + 0.6);
 
             // Impact noise/crack
@@ -370,7 +459,7 @@
             f.type = 'lowpass';
             f.frequency.setValueAtTime(1400, t);
             f.frequency.exponentialRampToValueAtTime(180, t + 0.12);
-            n.connect(f); f.connect(env(c, 0.5, 0.16, t));
+            n.connect(f); f.connect(env(c, 0.5 * vol, 0.16, t));
             n.start(t); n.stop(t + 0.2);
         }
     }
@@ -433,6 +522,131 @@
             o.start(t + i * 0.07);
             o.stop(t + i * 0.07 + 0.4);
         });
+    }
+
+    async function loadBouncySound() {
+        if (bouncyBuffer || bouncyLoading) return;
+        bouncyLoading = true;
+        try {
+            const c = ac();
+            if (c) {
+                const resp = await fetch(getAssetUrl('bouncy'));
+                const arrayBuffer = await resp.arrayBuffer();
+                bouncyBuffer = await decodeAudioDataSafe(c, arrayBuffer);
+            }
+        } catch (e) {
+            console.error('Error loading bouncy sound:', e);
+        } finally {
+            bouncyLoading = false;
+        }
+    }
+
+    function bouncy(volumeScale = 1.0) {
+        const c = ac(); if (!c) return;
+        const t = c.currentTime;
+        const vol = Math.max(0, typeof volumeScale === 'number' ? volumeScale : 1.0);
+        if (bouncyBuffer) {
+            const src = c.createBufferSource();
+            src.buffer = bouncyBuffer;
+            // Increased random detune for wider pitch variety
+            if (src.detune && src.detune.setValueAtTime) {
+                src.detune.setValueAtTime((Math.random() * 2 - 1) * 450, t);
+            }
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.88 * vol, t);
+            src.connect(g);
+            g.connect(masterGain || c.destination);
+            // Play from a random offset within the first 5% of the audio clip
+            const offset = Math.random() * (bouncyBuffer.duration * 0.05);
+            src.start(t, offset);
+        } else {
+            loadBouncySound();
+            // Synth fallback: cartoon boing / spring glide
+            const o = c.createOscillator();
+            o.type = 'sine';
+            const f0 = 160 + (Math.random() * 2 - 1) * 70;
+            o.frequency.setValueAtTime(f0, t);
+            o.frequency.exponentialRampToValueAtTime(f0 * 2.2, t + 0.08);
+            o.frequency.exponentialRampToValueAtTime(f0 * 0.8, t + 0.28);
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.001, t);
+            g.gain.exponentialRampToValueAtTime(0.35 * vol, t + 0.03);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+            o.connect(g);
+            g.connect(masterGain || c.destination);
+            o.start(t);
+            o.stop(t + 0.35);
+        }
+    }
+
+    // Two brittle dragon egg shell cracks; one is picked at random on egg strikes.
+    const EGG_CRACK_IDS = ['egg_crack_1', 'egg_crack_2'];
+
+    async function loadEggSounds() {
+        if (eggLoading) return;
+        eggLoading = true;
+        try {
+            const c = ac();
+            if (c) {
+                await Promise.all(EGG_CRACK_IDS.map(async (id, i) => {
+                    if (eggBuffers[i]) return;
+                    try {
+                        const resp = await fetch(getAssetUrl(id));
+                        const arrayBuffer = await resp.arrayBuffer();
+                        eggBuffers[i] = await decodeAudioDataSafe(c, arrayBuffer);
+                    } catch (e) {
+                        console.error('Error loading ' + id + ':', e);
+                    }
+                }));
+            }
+        } catch (e) {
+            console.error('Error in loadEggSounds:', e);
+        } finally {
+            eggLoading = false;
+        }
+    }
+
+    // Brittle fracture sound for striking dragon eggshell with heavy detuning
+    function eggCrack(volumeScale = 1.0) {
+        const c = ac(); if (!c) return;
+        const t = c.currentTime;
+        const vol = Math.max(0, typeof volumeScale === 'number' ? volumeScale : 1.0);
+        const ready = eggBuffers.filter(Boolean);
+        if (ready.length) {
+            const buf = ready[(Math.random() * ready.length) | 0];
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            // A lot of random detune (±600 cents) for varied eggshell fractures
+            if (src.detune && src.detune.setValueAtTime) {
+                src.detune.setValueAtTime((Math.random() * 2 - 1) * 600, t);
+            }
+            const g = c.createGain();
+            g.gain.setValueAtTime(0.85 * vol, t);
+            src.connect(g);
+            g.connect(masterGain || c.destination);
+            src.start(t);
+            if (ready.length < EGG_CRACK_IDS.length) loadEggSounds();
+            return;
+        }
+        loadEggSounds();
+        // Synth fallback: sharp brittle snap / crackle
+        const n = noise(c);
+        const f = c.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.setValueAtTime(2400 + (Math.random() * 2 - 1) * 600, t);
+        n.connect(f);
+        f.connect(env(c, 0.45 * vol, 0.06, t));
+        n.start(t);
+        n.stop(t + 0.08);
+
+        const o = c.createOscillator();
+        o.type = 'triangle';
+        const f0 = 700 + (Math.random() * 2 - 1) * 200;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(140, t + 0.05);
+        o.connect(env(c, 0.25 * vol, 0.07, t));
+        o.start(t);
+        o.stop(t + 0.09);
     }
 
     function bounce() {
@@ -535,7 +749,10 @@
         loadHammerSound();
         loadIceSound();
         loadMetalThuds();
+        loadGearSounds();
         loadSoftBounceSound();
+        loadBouncySound();
+        loadEggSounds();
         loadMusic();
     }
 
@@ -611,17 +828,49 @@
     // session. Holds are keyed by name rather than counted so an unmatched resume
     // (visibilitychange fires visible-side without a preceding hidden) is a no-op
     // instead of driving a counter negative.
-    const audioHolds = new Set();
+    //
+    // A hold silences in two stages, neither of them immediate, because the most
+    // common ad break by far is the one that never fills: it is requested, settles a
+    // few hundred ms later with nothing shown, and a hold that acted at once would
+    // make every level change audibly dip for an ad the player never saw. Muting the
+    // buses is cheap and reversible, so it waits out a short grace; suspending the
+    // context is the expensive half — it takes the audio thread down and back up,
+    // which is heard as a gap — so it waits considerably longer. Releasing every hold
+    // inside a grace cancels that stage, and a break that never fills clears both
+    // before either fires, leaving the audio untouched.
+    //
+    // Tab backgrounding does not rely on either timer: applyGains() reads
+    // document.hidden directly, so a hidden tab silences on the spot.
+    const MUTE_GRACE_MS = 220;
+    const SUSPEND_GRACE_MS = 900;
+    let muteTimer = 0;
+    let suspendTimer = 0;
     let visibilityAudioSuspended = false;
+
     function pauseForVisibility(reason) {
         audioHolds.add(reason || 'visibility');
-        const c = window._cubeAudioCtx;
-        // Sticky on purpose: whoever found it running owns the resume, and a later
-        // hold arriving after the suspend must not clear that duty.
-        if (c && c.state === 'running') {
-            visibilityAudioSuspended = true;
-            c.suspend().catch(() => { visibilityAudioSuspended = false; });
+
+        if (!muteTimer && !holdsMuted) {
+            muteTimer = setTimeout(() => {
+                muteTimer = 0;
+                if (!audioHolds.size) return; // released during the grace period
+                holdsMuted = true;
+                applyGains();
+            }, MUTE_GRACE_MS);
         }
+
+        if (suspendTimer) return; // an earlier hold is already counting down
+        suspendTimer = setTimeout(() => {
+            suspendTimer = 0;
+            if (!audioHolds.size) return;
+            const c = window._cubeAudioCtx;
+            // Sticky on purpose: whoever found it running owns the resume, and a later
+            // hold arriving after the suspend must not clear that duty.
+            if (c && c.state === 'running') {
+                visibilityAudioSuspended = true;
+                c.suspend().catch(() => { visibilityAudioSuspended = false; });
+            }
+        }, SUSPEND_GRACE_MS);
     }
 
 
@@ -636,6 +885,9 @@
     function resumeFromVisibility(reason) {
         audioHolds.delete(reason || 'visibility');
         if (audioHolds.size) return; // another pause source is still holding it down
+        if (muteTimer) { clearTimeout(muteTimer); muteTimer = 0; }
+        if (suspendTimer) { clearTimeout(suspendTimer); suspendTimer = 0; }
+        if (holdsMuted) { holdsMuted = false; applyGains(); }
         const c = window._cubeAudioCtx;
         if (!visibilityAudioSuspended || !c) return;
         visibilityAudioSuspended = false;
@@ -658,8 +910,12 @@
             if (!data) return;
             const sfx = typeof data === 'string' ? data : data.sfx;
             const arg = data && data.arg;
-            if (sfx === 'thunk') thunk(arg);
+            const vol = data && (data.volumeScale !== undefined ? data.volumeScale : data.vol);
+            if (sfx === 'thunk') thunk(arg, vol !== undefined ? vol : 1.0);
+            else if (sfx === 'gear' || sfx === 'gearClank') gearClank(vol !== undefined ? vol : 1.0);
             else if (sfx === 'bounce') bounce();
+            else if (sfx === 'bouncy') bouncy(vol !== undefined ? vol : 1.0);
+            else if (sfx === 'eggCrack') eggCrack(vol !== undefined ? vol : 1.0);
             else if (sfx === 'shatter') shatter();
             else if (sfx === 'metalThud') metalThud();
             else if (sfx === 'boom') boom();
@@ -680,5 +936,5 @@
         });
     }
 
-    window.CubeCrackerAudio = { thunk, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
+    window.CubeCrackerAudio = { thunk, gearClank, metalThud, shatter, boom, reveal, chime, win, startOverJingle, bounce, bouncy, eggCrack, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
 })();

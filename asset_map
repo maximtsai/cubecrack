@@ -32,6 +32,34 @@ const assets = {
   "metal_thud_3": {
     "url": "audio/metal_thud_3.mp3",
     "type": "audio"
+  },
+  "gear_1": {
+    "url": "audio/gear_1.mp3",
+    "type": "audio"
+  },
+  "gear_2": {
+    "url": "audio/gear_2.mp3",
+    "type": "audio"
+  },
+  "gear_3": {
+    "url": "audio/gear_3.mp3",
+    "type": "audio"
+  },
+  "gear_4": {
+    "url": "audio/gear_4.mp3",
+    "type": "audio"
+  },
+  "bouncy": {
+    "url": "audio/bouncy.mp3",
+    "type": "audio"
+  },
+  "egg_crack_1": {
+    "url": "audio/egg_crack_1.mp3",
+    "type": "audio"
+  },
+  "egg_crack_2": {
+    "url": "audio/egg_crack_2.mp3",
+    "type": "audio"
   }
 };
 

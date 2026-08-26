@@ -547,7 +547,7 @@ h1 {
     width: calc(var(--u) * 27);
     height: calc(var(--u) * 27);
     fill: #ffffff;
-    transform: translateX(calc(var(--u) * 2));
+    transform: translateX(calc(var(--u) * 2 - 3px));
 }
 
 @media (orientation: landscape) {
@@ -558,10 +558,11 @@ h1 {
         right: calc(var(--u) * -2);
         border-radius: calc(var(--u) * 8);
     }
+
     .ad-play-icon {
         width: calc(var(--u) * 21);
         height: calc(var(--u) * 21);
-        transform: translateX(calc(var(--u) * 1.5));
+        transform: translateX(calc(var(--u) * 1.5 - 3px));
     }
 }
 
@@ -575,6 +576,7 @@ h1 {
         transform: scale(0);
         opacity: 0;
     }
+
     100% {
         transform: scale(1);
         opacity: 1;
@@ -602,8 +604,15 @@ h1 {
 }
 
 @keyframes toolBtnPendingPulse {
-    0% { transform: scale(0.96); opacity: 0.5; }
-    100% { transform: scale(1.02); opacity: 0.8; }
+    0% {
+        transform: scale(0.96);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(1.02);
+        opacity: 0.8;
+    }
 }
 
 /* NEW TOOL tooltip - small bubble above a freshly unlocked tool button */
@@ -1848,7 +1857,7 @@ body.intro-hide-ui #options-btn {
     }
 
     100% {
-        transform: translate(-50%, calc(-50% - calc(var(--u) * 130))) scale(0.7) rotate(var(--rot-end));
+        transform: translate(-50%, calc(-50% - calc(var(--u) * 9))) scale(0.7) rotate(var(--rot-end));
         opacity: 0;
     }
 }

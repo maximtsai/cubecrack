@@ -61,6 +61,15 @@
             shape: 'geode', colors: OBSIDIAN, name: 'OBSIDIAN GEODE', won: 'GEODE CRACKED', break: 'obsidian', rough: 0.18, metal: 0.42,
             sizeMul: 1.35, cam: 1.15, chunkMul: 1.9, bg: 'radial-gradient(120% 90% at 50% 38%, #2c1d3f 0%, #17101f 55%, #0a0710 100%)'
         },
+        // Not a fractured solid: `build:'gears'` packs the orb's volume with individual
+        // solid gear pieces of assorted sizes, plus three small clumps of dirt that hide
+        // the gems. chunkMul here is the gear count, not a fracture density.
+        {
+            shape: 'orb', colors: BRASS, name: 'CLOCKWORK SPHERE', won: 'CLOCKWORK STOPPED', break: 'clockwork', build: 'gears', gear: true, rough: 0.34, metal: 0.72,
+            // chunkMul is the gear count multiplier here (150 * mul): 0.8533 -> 128 gears
+
+            sizeMul: 1.45, cam: 1.28, chunkMul: 0.8533, bg: 'radial-gradient(120% 90% at 50% 38%, #4a3a1c 0%, #241c0e 55%, #120e07 100%)'
+        },
         // `blocks: 4` embeds four solid metal cubes in the core, three of them shoved out far
         // enough that a corner breaks the skin (see planEmbeddedBlocks) — those are visible and
         // hittable from the first frame, while the fourth is sealed in and has to be dug out.
@@ -69,15 +78,6 @@
             shape: 'orb', colors: MAGMA, name: 'MOLTEN CORE', won: 'CORE QUENCHED', break: 'molten', rough: 0.62, metal: 0.14,
             blocks: 4, blocksJut: 3, blockLayout: 'embedded',
             sizeMul: 1.56, cam: 1.20, chunkMul: 2.59, bg: 'radial-gradient(120% 90% at 50% 38%, #5c1c0a 0%, #2c0d06 55%, #150503 100%)'
-        },
-        // Not a fractured solid: `build:'gears'` packs the orb's volume with individual
-        // solid gear pieces of assorted sizes, plus three small clumps of dirt that hide
-        // the gems. chunkMul here is the gear count, not a fracture density.
-        {
-            shape: 'orb', colors: BRASS, name: 'CLOCKWORK SPHERE', won: 'CLOCKWORK STOPPED', break: 'clockwork', build: 'gears', rough: 0.34, metal: 0.72,
-            // chunkMul is the gear count multiplier here (150 * mul): 0.8533 -> 128 gears
-
-            sizeMul: 1.45, cam: 1.28, chunkMul: 0.8533, bg: 'radial-gradient(120% 90% at 50% 38%, #4a3a1c 0%, #241c0e 55%, #120e07 100%)'
         },
         // Fossilized tree trunk: a stone-hard cylinder painted with concentric growth
         // rings (see the `petrified` block in build()). The outermost ring is bark and
@@ -763,6 +763,7 @@ uniform float uDim;
     let plantedBomb = null; // {mesh, mat, light, hitLocal, nLocal, t} — fuse burning
     let revealedOnce = false;
     let gameOver = false;
+    let lastEruptionSoundTime = -999;
     // Shared ad and host pause flags across interstitials and rewarded ads
     let adPausedOwner = null; // null | 'interstitial' | 'rewarded'
     let hostPaused = false;
@@ -1204,8 +1205,8 @@ uniform float uDim;
                                     : material === 'reliquary' ? 'reliquaryHint'
                                         : level === 12 ? 'greatCubeHint'
                                             : material === 'star' ? 'starHint'
-                                            : level === 0 ? 'dragHint'
-                                                : 'levelHint';
+                                                : level === 0 ? 'dragHint'
+                                                    : 'levelHint';
     }
 
     // A gem must sit at least this far inside every face so its encasing chunk is
@@ -1309,9 +1310,9 @@ uniform float uDim;
     // profile's segment count: the hole is tiny on screen, so the plates are stitched
     // between the fine outer ring and the coarse inner ring instead of quad-per-segment.
     const BORE_SEGS = 6;
-    function makeGearGeometry(R, T, teeth, base) {
+    function makeGearGeometry(R, T, teeth, base, rootRatio = 0.74) {
         const half = T * 0.5;
-        const rootR = R * 0.74;
+        const rootR = R * (typeof rootRatio === 'number' ? rootRatio : 0.74);
         const holeR = R * 0.27;
         const N = teeth * 4;
         const px = new Float64Array(N), pz = new Float64Array(N), pa = new Float64Array(N);
@@ -2267,13 +2268,60 @@ uniform float uDim;
         return p.distanceTo(_rodP.copy(rig.home).addScaledVector(rig.axis, t));
     }
 
+    // ---------- clockwork sphere: large top & bottom drive gears ----------
+    // Heavy metal clockwork gears attached to both poles of the orb. They tick forward
+    // with a bouncy rotation every 1s in opposite directions, and buckle under BAND_HP
+    // blows before tearing off in one piece.
+    function buildPoleGears() {
+        const R = shape.bound.x * 0.90; // ~15% larger
+        const T = R * 0.20;
+        const teeth = 14;
+        const geo = makeGearGeometry(R, T, teeth, METALS[0], 0.84); // stubbier teeth
+        const poles = [
+            { y: -shape.bound.y * 1.10, dir: 1 },  // bottom gear
+            { y: shape.bound.y * 1.10, dir: -1 },  // top gear (opposing rotation)
+        ];
+        for (const p of poles) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xcaa258, roughness: 0.30, metalness: 0.93, flatShading: true,
+                emissive: 0xffd9a0, emissiveIntensity: 0,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(0, p.y, 0);
+            cubeGroup.add(mesh);
+
+            // invisible tap target sleeved over the gear — slightly smaller than visual radius
+            const hit = new THREE.Mesh(
+                new THREE.CylinderGeometry(R * 0.88, R * 0.88, T * 1.2, 16, 1, false),
+                new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+            );
+            hit.position.set(0, p.y, 0);
+            hit.userData.kind = 'band';
+            cubeGroup.add(hit);
+
+            const rig = {
+                mesh, mat, hit, hits: 0, shake: 0, gear: true,
+                y: p.y, home: mesh.position.clone(),
+                fromAngle: 0, targetAngle: 0, tickTimer: 0,
+                stepAngle: ((Math.PI * 2) / teeth) * p.dir,
+            };
+            hit.userData.band = rig;
+            bandRigs.push(rig);
+        }
+        setBandsVisible(false); // snap on once the sphere finishes assembling
+    }
+
     // A blow that landed on a metal band. It rings, the hoop shudders on the stone and dents a
     // shade darker; nothing around it breaks. Once it has taken BAND_HP hits it tears off whole.
     function bandStrike(rig) {
         const hitWorld = cubeGroup.localToWorld(swing.hitLocal.clone());
         rig.hits++;
         rig.shake = 1;
-        CubeCrackerAudio.metalThud();
+        if (rig.gear) {
+            CubeCrackerAudio.gearClank();
+        } else {
+            CubeCrackerAudio.metalThud();
+        }
         if (window.hapticsEnabled !== false && navigator.vibrate) {
             try { navigator.vibrate(22); } catch (e) { }
         }
@@ -2287,7 +2335,7 @@ uniform float uDim;
         const k = Math.min(rig.hits / BAND_HP, 1); // battered metal darkens
         rig.mat.color.setRGB(0.60 - k * 0.20, 0.64 - k * 0.22, 0.68 - k * 0.24);
         if (rig.hits >= BAND_HP) {
-            spawnJuiceText(rig.rod ? 'ROD SNAPS!!!' : rig.block ? 'METAL BREAKS!!!' : 'BAND BREAKS!!!',
+            spawnJuiceText(rig.rod ? 'ROD SNAPS!!!' : rig.gear ? 'GEAR SHATTERS!!!' : rig.block ? 'METAL BREAKS!!!' : 'BAND BREAKS!!!',
                 hitWorld, '#dbe7ff', '44px');
             breakBand(rig, hitWorld);
         } else {
@@ -2822,6 +2870,7 @@ uniform float uDim;
         if (lvl.bands) buildBands(lvl.bands); // solid metal rings clamped around the solid
         if (lvl.blocks) buildBlocks(blockPlan); // solid metal cubes buried inside it
         if (lvl.rods) buildRods(lvl.rods); // long metal rods crossed and stabbed through it
+        if (lvl.gear || lvl.build === 'gears') buildPoleGears(); // ticking metal gears at both poles
         if (material === 'hive') buildHoneyDrips(); // purely decorative honey drips
         if (material === 'molten') buildLavaStreams(); // bleeding wounds pour lava down the rock
 
@@ -3117,8 +3166,18 @@ uniform float uDim;
         }
         shake = (window.screenShakeEnabled !== false) ? 0.16 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
         kick = 0.08 * MOTION; // kick the camera back slightly on impact!
-        // glassy/metal solids ring; rock and magma thud
-        CubeCrackerAudio.thunk(material === 'ice' || material === 'obsidian' || material === 'clockwork' || material === 'reliquary' || material === 'star');
+        // clockwork gears clank; honeycomb sounds bouncy; egg cracks shell; glassy/metal solids ring; rock and magma thud
+        if (material === 'clockwork') {
+            CubeCrackerAudio.gearClank();
+        } else if (material === 'hive') {
+            CubeCrackerAudio.bouncy();
+            CubeCrackerAudio.thunk(false, 0.43, -500);
+        } else if (material === 'egg') {
+            CubeCrackerAudio.eggCrack();
+            CubeCrackerAudio.thunk(false, 1.0);
+        } else {
+            CubeCrackerAudio.thunk(material === 'ice' || material === 'obsidian' || material === 'reliquary' || material === 'star');
+        }
         const hitWorld = cubeGroup.localToWorld(swing.hitLocal.clone());
         spawnDust(hitWorld, swing.n);
         spawnCubeDust(hitWorld, swing.n);
@@ -3145,8 +3204,8 @@ uniform float uDim;
         }
         spawnJuiceText(word, hitWorld, textColor);
 
-        // Trigger Cube Wobble (elastic squash-and-stretch rebound) - slightly reduced
-        wobbleAmp = 0.035 * MOTION;
+        // Trigger Cube Wobble (elastic squash-and-stretch rebound)
+        wobbleAmp = (material === 'hive' ? 0.0525 : 0.035) * MOTION;
         wobbleTime = 0;
 
         applyMaterialDamage(hitWorld, cfg.hitRadius);
@@ -3366,6 +3425,9 @@ uniform float uDim;
         shake = (window.screenShakeEnabled !== false) ? 0.44 * MOTION : 0; if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
         kick = 0.24 * MOTION;
         CubeCrackerAudio.boom();
+        if (material === 'hive') {
+            CubeCrackerAudio.bouncy();
+        }
 
         const hitLocal = cubeGroup.worldToLocal(hitWorld.clone());
         spawnShockwave(hitWorld, nWorld);
@@ -3420,14 +3482,14 @@ uniform float uDim;
         for (const rig of bandRigs.slice()) {
             const d = rig.rod
                 ? rodDist(hitLocal, rig)
-                : rig.block
+                : (rig.block || rig.gear)
                     ? rig.home.distanceTo(hitLocal)
                     : Math.abs(rig.y - hitLocal.y);
             // Only a blast planted moderately close shears the metal outright. Further
             // out the shockwave just buckles it (one BAND_HP hit's worth), so you still
             // have to finish the job with the hammer.
-            const shearR = (rig.block || rig.rod) ? R * 0.62 : R * 0.55;
-            const jarR = (rig.block || rig.rod) ? R * 1.3 : R * 1.15;
+            const shearR = (rig.block || rig.rod || rig.gear) ? R * 0.62 : R * 0.55;
+            const jarR = (rig.block || rig.rod || rig.gear) ? R * 1.3 : R * 1.15;
             if (d < shearR) {
                 breakBand(rig, hitWorld);
             } else if (d < jarR) {
@@ -5542,7 +5604,8 @@ uniform float uDim;
             const sY = 1.0 - Math.cos(wobbleTime) * wobbleAmp;
             const sXZ = 1.0 + Math.cos(wobbleTime) * wobbleAmp * 0.5;
             cubeGroup.scale.set(sXZ, sY, sXZ);
-            wobbleAmp *= Math.exp(-scaledDt * 7.5); // scaledDt!
+            const decayRate = material === 'hive' ? 4.0 : 7.5;
+            wobbleAmp *= Math.exp(-scaledDt * decayRate); // scaledDt!
             dirty = true;
         } else {
             cubeGroup.scale.set(1, 1, 1);
@@ -5588,7 +5651,11 @@ uniform float uDim;
                 erupted++;
             }
             if (erupted) {
-                CubeCrackerAudio.thunk(false);
+                const now = performance.now() * 0.001;
+                const isRecent = (now - lastEruptionSoundTime) < 0.25;
+                lastEruptionSoundTime = now;
+                const eruptionVol = isRecent ? 0.3 : 1.0;
+                CubeCrackerAudio.thunk(false, eruptionVol);
                 if (window.screenShakeEnabled !== false) shake = Math.max(shake, 0.1 * MOTION); if (window.hapticsEnabled !== false && navigator.vibrate) { try { navigator.vibrate(14); } catch (e) { } }
                 exposeGems();
                 flushMergedUpdates();
@@ -5639,8 +5706,27 @@ uniform float uDim;
             rig.group.position.x += Math.sin(time * 71) * a * 0.12;
             dirty = true;
         }
-        // pillar: a struck metal band shuddering on the stone, its flare dying back down
+        // pillar & clockwork: metal bands / gear shuddering on hit, or ticking forward
         for (const rig of bandRigs) {
+            if (rig.gear) {
+                rig.tickTimer += scaledDt;
+                if (rig.tickTimer >= 1.0) {
+                    rig.tickTimer = 0;
+                    rig.fromAngle = rig.targetAngle;
+                    rig.targetAngle += rig.stepAngle;
+                }
+                const tickDur = 0.22;
+                if (rig.tickTimer < tickDur) {
+                    const u = rig.tickTimer / tickDur;
+                    const angle = rig.fromAngle + (rig.targetAngle - rig.fromAngle) * easeOutBack(u);
+                    rig.mesh.rotation.y = angle;
+                    rig.hit.rotation.y = angle;
+                } else {
+                    rig.mesh.rotation.y = rig.targetAngle;
+                    rig.hit.rotation.y = rig.targetAngle;
+                }
+                dirty = true;
+            }
             if (rig.shake <= 0) continue;
             rig.shake = Math.max(0, rig.shake - scaledDt * 4.2);
             const a = rig.shake * 0.055;

@@ -966,12 +966,12 @@ window.I18N = Object.freeze({
     }),
     levelNameKeys: Object.freeze([
         'stoneCube', 'stonePillar', 'sandstonePyramid', 'iceHeart',
-        'obsidianGeode', 'moltenCore', 'clockworkSphere', 'fossilizedTrunk',
+        'obsidianGeode', 'clockworkSphere', 'moltenCore', 'fossilizedTrunk',
         'honeycombHive', 'chainReliquary', 'fallenStar', 'dragonEgg', 'greatCube'
     ]),
     levelWinKeys: Object.freeze([
         'wonCubeCracked', 'wonPillarCracked', 'wonPyramidCracked', 'wonHeartShattered',
-        'wonGeodeCracked', 'wonCoreQuenched', 'wonClockworkStopped', 'wonTrunkSplit',
+        'wonGeodeCracked', 'wonClockworkStopped', 'wonCoreQuenched', 'wonTrunkSplit',
         'wonHiveBroken', 'wonReliquaryOpened', 'wonStarDimmed', 'wonEggPlundered', 'wonGreatCubeCracked'
     ])
 });
@@ -1301,8 +1301,8 @@ window.gameConfig = {
         { gold: 8, silver: 14 },
         { gold: 10, silver: 18 },
         { gold: 8, silver: 13 },
-        { gold: 8, silver: 14 },
         { gold: 6, silver: 12 },
+        { gold: 8, silver: 14 },
         { gold: 8, silver: 20 },
         { gold: 10, silver: 20 },
         { gold: 10, silver: 20 },
