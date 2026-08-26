@@ -601,11 +601,25 @@
     // Browser audio keeps running when a tab is backgrounded unless we explicitly
     // suspend its shared context. Suspend only a context that was already playing, so
     // returning to a tab never bypasses the browser's first-gesture audio policy.
+    //
+    // Pause sources overlap — an interstitial pauses for the ad while the portal
+    // independently fires its own host pause over the top of it — so each one takes a
+    // named hold and the context only wakes when the last hold is released. A plain
+    // boolean recomputed from c.state cannot express that: the second pauser reads an
+    // already-suspended context, concludes it never suspended anything, and both
+    // resumes then decline to undo it, leaving the game silent for the rest of the
+    // session. Holds are keyed by name rather than counted so an unmatched resume
+    // (visibilitychange fires visible-side without a preceding hidden) is a no-op
+    // instead of driving a counter negative.
+    const audioHolds = new Set();
     let visibilityAudioSuspended = false;
-    function pauseForVisibility() {
+    function pauseForVisibility(reason) {
+        audioHolds.add(reason || 'visibility');
         const c = window._cubeAudioCtx;
-        visibilityAudioSuspended = !!(c && c.state === 'running');
-        if (visibilityAudioSuspended) {
+        // Sticky on purpose: whoever found it running owns the resume, and a later
+        // hold arriving after the suspend must not clear that duty.
+        if (c && c.state === 'running') {
+            visibilityAudioSuspended = true;
             c.suspend().catch(() => { visibilityAudioSuspended = false; });
         }
     }
@@ -619,7 +633,9 @@
         }
     });
 
-    function resumeFromVisibility() {
+    function resumeFromVisibility(reason) {
+        audioHolds.delete(reason || 'visibility');
+        if (audioHolds.size) return; // another pause source is still holding it down
         const c = window._cubeAudioCtx;
         if (!visibilityAudioSuspended || !c) return;
         visibilityAudioSuspended = false;
@@ -630,8 +646,8 @@
     // Mute first so sounds triggered during the suspend transition cannot leak out.
     document.addEventListener('visibilitychange', () => {
         applyGains();
-        if (document.hidden) pauseForVisibility();
-        else resumeFromVisibility();
+        if (document.hidden) pauseForVisibility('visibility');
+        else resumeFromVisibility('visibility');
     });
 
 
@@ -658,8 +674,9 @@
         bus.subscribe('audio:volume:master', (data) => setMasterVol(data && data.volume !== undefined ? data.volume : data));
         bus.subscribe('audio:volume:music', (data) => setMusicVol(data && data.volume !== undefined ? data.volume : data));
         bus.subscribe('audio:visibility', (data) => {
-            if (data && data.hidden) pauseForVisibility();
-            else resumeFromVisibility();
+            const reason = (data && data.reason) || 'visibility';
+            if (data && data.hidden) pauseForVisibility(reason);
+            else resumeFromVisibility(reason);
         });
     }
 

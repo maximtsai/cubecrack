@@ -5822,6 +5822,14 @@ uniform float uDim;
     // resolves false on a missing, failed, skipped, or timed-out ad, so progression
     // must continue in every case.
     let levelTransitioning = false;
+    // The ad pause and the host pause are separate, overlapping claims on the same
+    // loop: the portal fires its own onPause over an interstitial, and the player can
+    // background the game while one is up. Each side tracks its own flag and neither
+    // resumes while the other still holds the game down, so a request that fails or
+    // hits its watchdog behind a backgrounded host cannot restart the simulation (and
+    // the music) under a host that believes the game is paused.
+    let adPaused = false;
+    let hostPaused = false;
     function showLevelInterstitial() {
         const sdk = window.GameSDK;
         if (!sdk || typeof sdk.showAd !== 'function' || typeof sdk.supports !== 'function' ||
@@ -5829,13 +5837,15 @@ uniform float uDim;
             return Promise.resolve(false);
         }
 
-        let adPaused = false;
         const resumeAfterAd = () => {
             if (!adPaused) return;
             adPaused = false;
+            // Always released, even under a host pause — the audio layer holds the
+            // context down for as long as the 'host' hold is outstanding.
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
-                window.CubeCrackerAudio.resumeFromVisibility();
+                window.CubeCrackerAudio.resumeFromVisibility('ad');
             }
+            if (hostPaused) return; // the host still has us backgrounded
             startLoop();
         };
         const pauseForAd = () => {
@@ -5843,7 +5853,7 @@ uniform float uDim;
             adPaused = true;
             handleInputBlur();
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
-                window.CubeCrackerAudio.pauseForVisibility();
+                window.CubeCrackerAudio.pauseForVisibility('ad');
             }
             stopLoop();
         };
@@ -6007,9 +6017,10 @@ uniform float uDim;
     // CPU/GPU/battery while paused, and discard the elapsed time on resume so the
     // physics doesn't jump by a huge dt.
     function hostPause() {
+        hostPaused = true;
         handleInputBlur();
         if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
-            window.CubeCrackerAudio.pauseForVisibility();
+            window.CubeCrackerAudio.pauseForVisibility('host');
         }
         stopLoop();
         // Last chance to get progress out before the player is gone.
@@ -6017,9 +6028,14 @@ uniform float uDim;
     }
 
     function hostResume() {
+        hostPaused = false;
         if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
-            window.CubeCrackerAudio.resumeFromVisibility();
+            window.CubeCrackerAudio.resumeFromVisibility('host');
         }
+        // An ad break outlives this signal on portals that resume the game the moment
+        // the ad closes: leave the loop stopped and let the ad's own resume start it,
+        // which is the path that also loads the next level.
+        if (adPaused) return;
         startLoop();
     }
 
