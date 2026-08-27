@@ -16,9 +16,14 @@
     let bouncyLoading = false;
     let eggBuffers = [null, null];
     let eggLoading = false;
-    let musicBuffer = null;
-    let musicLoading = false;
-    let musicSource = null;
+    const MUSIC_TRACKS = {
+        bgm1: { id: 'archaeological_bgm', buffer: null, loading: false },
+        bgm2: { id: 'archaeological_bgm_2', buffer: null, loading: false }
+    };
+    let currentMusicTrackKey = 'bgm1';
+    const MUSIC_FADEOUT_DURATION = 1.4; // seconds for outgoing track to fade out
+    const MUSIC_INCOMING_DELAY = 0.78;   // seconds into the fade before incoming music starts
+    let fadeOutStartTime = 0;
 
     function getAssetUrl(id) {
         return 'audio/' + id + '.mp3';
@@ -260,24 +265,30 @@
         }
     }
 
-    async function loadMusic() {
-        if (musicBuffer || musicLoading) return;
-        musicLoading = true;
+    async function loadMusicTrack(key) {
+        const track = MUSIC_TRACKS[key];
+        if (!track || track.buffer || track.loading) return;
+        track.loading = true;
         try {
             const c = ac();
             if (c) {
-                const resp = await fetch(getAssetUrl('archaeological_bgm'));
+                const resp = await fetch(getAssetUrl(track.id));
                 const arrayBuffer = await resp.arrayBuffer();
-                musicBuffer = await decodeAudioDataSafe(c, arrayBuffer);
-                if (musicRequested) {
-                    startMusic();
+                track.buffer = await decodeAudioDataSafe(c, arrayBuffer);
+                if (musicRequested && currentMusicTrackKey === key) {
+                    syncMusicPlayback();
                 }
             }
         } catch (e) {
-            console.error('Error loading music:', e);
+            console.error('Error loading music track ' + key + ' (' + (track && track.id) + '):', e);
         } finally {
-            musicLoading = false;
+            track.loading = false;
         }
+    }
+
+    async function loadMusic() {
+        loadMusicTrack('bgm1');
+        loadMusicTrack('bgm2');
     }
 
     function ac(autoResume = true) {
@@ -837,40 +848,115 @@
 
     // Music state stays private to this audio kit. Keeping it out of `window` avoids
     // accidental coupling with hot reloads or other game scripts.
+    let activeMusicSources = [];
     let musicPlaying = false;
     let musicRequested = false;
 
-    function startMusic() {
-        musicRequested = true;
-        if (musicPlaying) return;
+    function syncMusicPlayback() {
+        if (!musicRequested) return;
         const c = ac(true); if (!c) return;
+        const track = MUSIC_TRACKS[currentMusicTrackKey];
+        if (!track) return;
 
-        if (musicBuffer) {
-            musicPlaying = true;
-            if (musicSource) {
-                try { musicSource.stop(); } catch (e) { }
+        const now = c.currentTime;
+
+        // 1. Fade out active sources of any different track
+        let hadDifferentPlaying = false;
+        for (let i = activeMusicSources.length - 1; i >= 0; i--) {
+            const item = activeMusicSources[i];
+            if (item.trackKey !== currentMusicTrackKey) {
+                hadDifferentPlaying = true;
+                if (!item.fadingOut) {
+                    item.fadingOut = true;
+                    fadeOutStartTime = now;
+                    const g = item.gain.gain;
+                    g.cancelScheduledValues(now);
+                    g.setValueAtTime(g.value, now);
+                    g.linearRampToValueAtTime(0.0001, now + MUSIC_FADEOUT_DURATION);
+                    item.stopTimer = setTimeout(() => {
+                        try {
+                            item.source.stop();
+                            item.source.disconnect();
+                        } catch (e) { }
+                        const idx = activeMusicSources.indexOf(item);
+                        if (idx !== -1) activeMusicSources.splice(idx, 1);
+                    }, (MUSIC_FADEOUT_DURATION + 0.1) * 1000);
+                }
             }
-            musicSource = c.createBufferSource();
-            musicSource.buffer = musicBuffer;
-            musicSource.loop = true;
-            musicSource.connect(musicGain);
-            musicSource.start(0);
-        } else {
-            loadMusic();
         }
+
+        // 2. Check if current track is already playing or scheduled to start
+        const currentActive = activeMusicSources.find(s => s.trackKey === currentMusicTrackKey && !s.fadingOut);
+        if (currentActive) {
+            musicPlaying = true;
+            return;
+        }
+
+        // 3. Start current track if its buffer is decoded
+        if (track.buffer) {
+            musicPlaying = true;
+            const src = c.createBufferSource();
+            src.buffer = track.buffer;
+            src.loop = true;
+            const trackGain = c.createGain();
+
+            // When transitioning from an outgoing track, start 1s into the fade out;
+            // if no other track is fading out, start immediately.
+            const isTransition = hadDifferentPlaying || (fadeOutStartTime > 0 && (now - fadeOutStartTime < MUSIC_FADEOUT_DURATION));
+            const startTime = isTransition ? Math.max(now, fadeOutStartTime + MUSIC_INCOMING_DELAY) : now;
+
+            // Incoming music has NO fade-in; it starts at full strength
+            trackGain.gain.setValueAtTime(1.0, startTime);
+
+            src.connect(trackGain);
+            trackGain.connect(musicGain);
+            src.start(startTime);
+
+            activeMusicSources.push({
+                source: src,
+                gain: trackGain,
+                trackKey: currentMusicTrackKey,
+                fadingOut: false,
+                stopTimer: null
+            });
+        } else {
+            loadMusicTrack(currentMusicTrackKey);
+        }
+    }
+
+    function updateMusicForLevel(level) {
+        // level 6 or above (0-indexed: level >= 5) -> bgm2, otherwise bgm1
+        const key = (typeof level === 'number' && level >= 5) ? 'bgm2' : 'bgm1';
+        if (key !== currentMusicTrackKey) {
+            currentMusicTrackKey = key;
+            if (musicRequested || musicPlaying) {
+                syncMusicPlayback();
+            }
+        }
+    }
+
+    function startMusic(level) {
+        if (typeof level === 'number') {
+            updateMusicForLevel(level);
+        } else if (typeof window.level === 'number') {
+            updateMusicForLevel(window.level);
+        }
+        musicRequested = true;
+        syncMusicPlayback();
     }
 
     function stopMusic() {
         musicRequested = false;
-        if (!musicPlaying) return;
         musicPlaying = false;
-        if (musicSource) {
+        fadeOutStartTime = 0;
+        for (const item of activeMusicSources) {
+            if (item.stopTimer) clearTimeout(item.stopTimer);
             try {
-                musicSource.stop();
-                musicSource.disconnect();
+                item.source.stop();
+                item.source.disconnect();
             } catch (e) { }
-            musicSource = null;
         }
+        activeMusicSources = [];
     }
 
     // Browser audio keeps running when a tab is backgrounded unless we explicitly
@@ -970,8 +1056,9 @@
             else if (sfx === 'win') win();
             else if (sfx === 'startOverJingle') startOverJingle();
         });
-        bus.subscribe('audio:music:start', () => startMusic());
+        bus.subscribe('audio:music:start', (data) => startMusic(data && data.level !== undefined ? data.level : data));
         bus.subscribe('audio:music:stop', () => stopMusic());
+        bus.subscribe('audio:music:level', (data) => updateMusicForLevel(data && data.level !== undefined ? data.level : data));
         bus.subscribe('audio:warm', () => warm());
         bus.subscribe('audio:volume:master', (data) => setMasterVol(data && data.volume !== undefined ? data.volume : data));
         bus.subscribe('audio:volume:music', (data) => setMusicVol(data && data.volume !== undefined ? data.volume : data));
@@ -982,5 +1069,5 @@
         });
     }
 
-    window.CubeCrackerAudio = { thunk, gearClank, metalThud, shatter, quartzChime, boom, reveal, chime, win, startOverJingle, bounce, bouncy, eggCrack, warm, preloadAllAudio, startMusic, stopMusic, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
+    window.CubeCrackerAudio = { thunk, gearClank, metalThud, shatter, quartzChime, boom, reveal, chime, win, startOverJingle, bounce, bouncy, eggCrack, warm, preloadAllAudio, startMusic, stopMusic, updateMusicForLevel, pauseForVisibility, resumeFromVisibility, setMasterVol, setMusicVol, setHostAudioEnabled };
 })();

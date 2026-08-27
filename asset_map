@@ -9,6 +9,10 @@ const assets = {
     "url": "audio/archaeological_bgm.mp3",
     "type": "audio"
   },
+  "archaeological_bgm_2": {
+    "url": "audio/archaeological_bgm_2.mp3",
+    "type": "audio"
+  },
   "ice_crack": {
     "url": "audio/ice_crack.mp3",
     "type": "audio"

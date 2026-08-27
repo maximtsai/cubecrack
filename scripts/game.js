@@ -26,6 +26,7 @@
     const GEM_WOOD = { outer: [0.31, 0.20, 0.13], inner: [0.56, 0.41, 0.25] };
     const STARLIGHT = { outer: [0.58, 0.68, 0.92], inner: [0.92, 0.96, 1.00] };
     const EGGSHELL = { outer: [0.15, 0.34, 0.28], inner: [0.86, 0.68, 0.26] };
+    const DIRT_BALL = { outer: [0.32, 0.22, 0.15], inner: [0.46, 0.33, 0.22] };
     const GRANITE = { outer: [0.28, 0.275, 0.27], inner: [0.50, 0.49, 0.475] };
     const MOLTEN_GLOW = [1.0, 0.55, 0.16];   // heated-rock tint, just before it erupts
     // sizeMul: scales the shape's own half-extent before it's built (bigger solid).
@@ -168,9 +169,9 @@
     // cell comes out as a thin, flat plate wrapped around the trunk — bark, not gravel.
     // Courses are brick-laid and every seed jitters inside its own slot, so no two plates
     // match and the seams still wander.
-    const TRUNK_SHELLS = 9;   // plate layers from heartwood to bark (also the ring count)
+    const TRUNK_SHELLS = 12;  // plate layers from heartwood to bark (also the ring count)
     const TRUNK_CURVE = 0.75; // <1 packs the shells (so the plates) tighter toward the bark
-    const TRUNK_WRAP = 1.8;   // plates run this much wider around the trunk than they're tall
+    const TRUNK_WRAP = 2.4;   // plates run this much wider around the trunk than they're tall
 
     // Fractional shell coordinate for a normalized radius — the inverse of the shell radii
     // used below, so shell i spans t in [i, i+1). The plate layout and the growth-ring
@@ -199,11 +200,11 @@
             const spin = rng(); // every shell starts at its own angle
             for (let iy = 0; iy < ny; iy++) {
                 for (let ia = 0; ia < na; ia++) {
-                    const fa = (ia + 0.5 + (iy % 2) * 0.5 + spin + (rng() - 0.5) * 0.5) / na;
-                    const fy = (iy + 0.5 + (rng() - 0.5) * 0.6) / ny;
+                    const fa = (ia + 0.5 + (iy % 2) * 0.5 + spin + (rng() - 0.5) * 0.45) / na;
+                    const fy = (iy + 0.5 + (rng() - 0.5) * 0.5) / ny;
                     // jitter the radius in shell space, so a plate never strays out of its
                     // own layer (which would let a break jump two growth rings at once)
-                    const t = Math.min(Math.max((i + 0.5 + (rng() - 0.5) * 0.44) / TRUNK_SHELLS, 0.02), 1);
+                    const t = Math.min(Math.max((i + 0.5 + (rng() - 0.5) * 0.28) / TRUNK_SHELLS, 0.02), 1);
                     const rr = R * Math.pow(t, TRUNK_CURVE) * 0.985;
                     const a = fa * Math.PI * 2;
                     seeds.push(new V3(Math.cos(a) * rr, (fy - 0.5) * H * 0.985, Math.sin(a) * rr));
@@ -1032,7 +1033,7 @@ uniform float uDim;
     // in. The flare stays anchored to the gem for as long as it's alive: every active
     // ping is re-projected each frame (see updateGemPings), so dragging the solid or
     // moving the camera keeps the diamond and its ring on top of the gem.
-    const GEM_PING_BASE = 46;
+    const GEM_PING_BASE = 41.4;
     const GEM_PING_LIFE = 1.7; // seconds; matches the CSS animation duration
     let gemPings = [];
     const _pingWorld = new V3();
@@ -2177,12 +2178,13 @@ uniform float uDim;
             const mat = new THREE.MeshStandardMaterial({
                 color: qColor.color,
                 emissive: qColor.emissive,
-                emissiveIntensity: 0.55,
+                emissiveIntensity: 0.82,
                 roughness: 0.15,
-                metalness: 0.12,
+                metalness: 0.0,
                 transparent: true,
-                opacity: 0.94,
+                opacity: 0.95,
                 flatShading: true,
+                vertexColors: true,
             });
 
             const mesh = new THREE.Mesh(prismGeo, mat);
@@ -2784,6 +2786,7 @@ uniform float uDim;
         fxUniforms.uDim.value = 1; // shared: every other level stays fully lit
         if (starGlowEl) starGlowEl.style.opacity = '0';
         strikes = 0; collectedCount = 0; gameOver = false; revealedOnce = false; window.strikes = strikes; window.level = level; window.LEVELS = LEVELS;
+        if (window.CubeCrackerAudio) CubeCrackerAudio.updateMusicForLevel(level);
         updateLevelStrikeCounter();
         idleHint = 0; ghostPhase = 0;
         if (typeof ghostHammer !== 'undefined') hideGhostHammer();
@@ -3473,7 +3476,7 @@ uniform float uDim;
         window.strikes = strikes;
         updateLevelStrikeCounter(true);
         if (strikes === 1) {
-            CubeCrackerAudio.startMusic();
+            CubeCrackerAudio.startMusic(level);
         }
         // the chest is bound: nothing but the padlock models can be touched
         if (material === 'reliquary' && !chainsBroken) {
@@ -3743,7 +3746,9 @@ uniform float uDim;
         strikes++;
         window.strikes = strikes;
         bus('game:strike', { pop: true }); // the charge is a strike too — keep the HUD in sync
-        if (strikes === 1) bus('audio:music:start');
+        if (strikes === 1) {
+            if (window.CubeCrackerAudio) CubeCrackerAudio.startMusic(level);
+        }
         haptic([40, 30, 90]);
         shake = (window.screenShakeEnabled !== false) ? 0.44 * MOTION : 0;
         kick = 0.24 * MOTION;
@@ -4397,15 +4402,17 @@ uniform float uDim;
         const BR = R * 1.7;
         const toDetach = [];
         const isEndCap = shape && shape.bound && Math.abs(swing.hitLocal.y) > (shape.bound.y * 0.78);
-        const maxRingDiff = isEndCap ? 2 : 1;
+        const maxDeeper = isEndCap ? 2 : 1;
 
         for (const c of chunks) {
             if (!c.alive) continue;
-            const ringDiff = Math.abs(c.ring - hit.ring);
-            if (ringDiff > maxRingDiff) continue;
+            const deeper = hit.ring - c.ring;
+            // Can only reach at most 1 layer deeper toward the core (2 on end caps);
+            // higher up layers (c.ring >= hit.ring) are affected without restriction.
+            if (deeper > maxDeeper) continue;
 
-            // Small distance multiplier for cross-ring shards so current layer breaks preferentially
-            const distMul = (ringDiff === 0) ? 1.0 : (1.0 + ringDiff * 0.32);
+            // Small distance multiplier for deeper core layer so current/higher layers break cleanly
+            const distMul = deeper > 0 ? (1.0 + deeper * 0.32) : 1.0;
             const d = ringDist(c, swing.hitLocal) * distMul;
 
             if (hit.bark) {
@@ -4418,13 +4425,11 @@ uniform float uDim;
                     }
                 }
             } else {
-                // Inner ring shards: detach pieces in current/adjacent ring within blast radius
-                if (!c.bark) {
-                    if (d < BR || c === hit) {
-                        toDetach.push(c);
-                    } else if (d < BR * 1.6) {
-                        scorchChunk(c, 0.94);
-                    }
+                // Inner ring strike: detach pieces in current, adjacent deeper, or higher layers within blast radius
+                if (d < BR || c === hit) {
+                    toDetach.push(c);
+                } else if (d < BR * 1.6) {
+                    scorchChunk(c, 0.94);
                 }
             }
         }
@@ -5185,12 +5190,13 @@ uniform float uDim;
     const _dirtColorLerp = new THREE.Color(0x4a3525);
     const _dirtSpawnPos = new V3();
     function spawnHugeDirtCubes() {
+        const lvl = LEVELS[level];
+        const isGreatCube = (lvl && (lvl.blockLayout === 'greatCube' || lvl.name === 'GREAT CUBE')) || level === 13;
         // mobile: fewer clouds, each a touch larger to compensate; weak GPUs get the leanest set
         const count = (tier.weak ? 15 : tier.mobile ? 20 : 30) + Math.floor(Math.random() * 10);
-        const sizeBoost = (tier.mobile ? 1.12 : 1) * (level === 12 ? 2 : 1);
-        const velocityBoost = level === 12 ? 1.65 : 1;
-        const spawnRadiusBoost = level === 12 ? 3 : 1;
-        const lvl = LEVELS[level];
+        const sizeBoost = (tier.mobile ? 1.12 : 1) * (isGreatCube ? 2 : 1);
+        const velocityBoost = isGreatCube ? 2.475 : 1;
+        const spawnRadiusBoost = isGreatCube ? 6.75 : 1;
         if (lvl && lvl.colors) {
             _dirtBaseColor.setRGB(lvl.colors.outer[0], lvl.colors.outer[1], lvl.colors.outer[2]);
         } else {
@@ -5789,6 +5795,13 @@ uniform float uDim;
     // Wheel event for desktop mouse scroll zoom
     if (window._cubeWheel) window.removeEventListener('wheel', window._cubeWheel);
     window._cubeWheel = (e) => {
+        if (e.target && e.target.closest && e.target.closest('#level-overlay, #options-overlay, .modal-overlay, #overlay')) {
+            return;
+        }
+        if (document.getElementById('level-overlay')?.classList.contains('show') ||
+            document.getElementById('options-overlay')?.classList.contains('show')) {
+            return;
+        }
         if (e.cancelable) e.preventDefault();
         const delta = Math.sign(e.deltaY) * 0.05;
         zoomFactor = THREE.MathUtils.clamp(zoomFactor + delta, MIN_ZOOM, MAX_ZOOM);
@@ -5799,12 +5812,18 @@ uniform float uDim;
     // Global touch listeners to suppress parent iframe container scroll / pull-to-refresh
     if (window._cubeTouchStart) window.removeEventListener('touchstart', window._cubeTouchStart);
     window._cubeTouchStart = (e) => {
+        if (e.target && e.target.closest && e.target.closest('#level-overlay, #options-overlay, .modal-overlay, #overlay')) {
+            return;
+        }
         if (e.touches.length > 1 && e.cancelable) e.preventDefault();
     };
     window.addEventListener('touchstart', window._cubeTouchStart, { passive: false });
 
     if (window._cubeTouchMove) window.removeEventListener('touchmove', window._cubeTouchMove);
     window._cubeTouchMove = (e) => {
+        if (e.target && e.target.closest && e.target.closest('#level-overlay, #options-overlay, .modal-overlay, #overlay')) {
+            return;
+        }
         if (e.cancelable) e.preventDefault();
     };
     window.addEventListener('touchmove', window._cubeTouchMove, { passive: false });

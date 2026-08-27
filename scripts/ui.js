@@ -93,6 +93,13 @@ const initLevelSelect = () => {
         if (e.target === newOverlay) newOverlay.classList.remove('show');
     });
 
+    newOverlay.addEventListener('wheel', (e) => {
+        const list = newOverlay.querySelector('#level-list');
+        if (list && !e.target.closest('#level-list')) {
+            list.scrollTop += e.deltaY;
+        }
+    }, { passive: true });
+
     window.renderLevelList();
 };
 

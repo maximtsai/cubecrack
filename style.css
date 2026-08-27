@@ -547,7 +547,7 @@ h1 {
     width: calc(var(--u) * 27);
     height: calc(var(--u) * 27);
     fill: #ffffff;
-    transform: translateX(calc(var(--u) * 2 - 3px));
+    transform: translateX(calc(var(--u) * 2 - 2px));
 }
 
 @media (orientation: landscape) {
@@ -562,7 +562,7 @@ h1 {
     .ad-play-icon {
         width: calc(var(--u) * 21);
         height: calc(var(--u) * 21);
-        transform: translateX(calc(var(--u) * 1.5 - 3px));
+        transform: translateX(calc(var(--u) * 1.5 - 2px));
     }
 }
 
@@ -687,9 +687,9 @@ h1 {
 /* UI-level gem resonance visuals (drawn on top of the solid) */
 .gem-ping {
     position: fixed;
-    width: calc(var(--u) * 46);
-    height: calc(var(--u) * 46);
-    border-radius: calc(var(--u) * 7);
+    width: calc(var(--u) * 43);
+    height: calc(var(--u) * 43);
+    border-radius: calc(var(--u) * 6.5);
     pointer-events: none;
     z-index: 99998;
     transform: translate(-50%, -50%) rotate(45deg) scale(0.2);
@@ -724,8 +724,8 @@ h1 {
 
 .gem-ring {
     position: fixed;
-    width: calc(var(--u) * 46);
-    height: calc(var(--u) * 46);
+    width: calc(var(--u) * 43);
+    height: calc(var(--u) * 43);
     border-radius: 50%;
     border: calc(var(--u) * 2) solid currentColor;
     pointer-events: none;
@@ -1409,6 +1409,31 @@ body.intro-hide-ui #options-btn {
     margin-bottom: 0;
 }
 
+#level-list {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(232, 201, 138, 0.4) rgba(0, 0, 0, 0.2);
+}
+
+#level-list::-webkit-scrollbar {
+    width: calc(var(--u) * 6);
+}
+
+#level-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: calc(var(--u) * 4);
+}
+
+#level-list::-webkit-scrollbar-thumb {
+    background: rgba(232, 201, 138, 0.4);
+    border-radius: calc(var(--u) * 4);
+}
+
+#level-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(232, 201, 138, 0.7);
+}
+
 .options-card h2 {
     font-size: calc(var(--u) * 28);
     color: var(--gold);
@@ -1496,11 +1521,11 @@ body.intro-hide-ui #options-btn {
 /* Language Select Dropdown */
 .lang-select {
     width: 100%;
-    background: rgba(0, 0, 0, 0.4);
-    border: calc(var(--u) * 1) solid rgba(232, 201, 138, 0.5);
-    border-radius: calc(var(--u) * 8);
+    background: rgba(0, 0, 0, 0.3);
+    border: calc(var(--u) * 1) solid rgba(232, 201, 138, 0.3);
+    border-radius: calc(var(--u) * 4);
     color: var(--gold);
-    padding: calc(var(--u) * 24) calc(var(--u) * 48) calc(var(--u) * 24) calc(var(--u) * 20);
+    padding: calc(var(--u) * 16) calc(var(--u) * 48) calc(var(--u) * 16) calc(var(--u) * 20);
     font-family: Cinzel, serif;
     font-size: calc(var(--u) * 26);
     font-weight: bold;
@@ -1512,13 +1537,12 @@ body.intro-hide-ui #options-btn {
     background-repeat: no-repeat;
     background-position: right calc(var(--u) * 20) center;
     background-size: calc(var(--u) * 28);
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-    min-height: calc(var(--u) * 96);
+    transition: border-color 0.2s ease;
+    min-height: calc(var(--u) * 76);
 }
 
 .lang-select:hover {
-    border-color: var(--gold);
-    box-shadow: 0 0 calc(var(--u) * 10) rgba(232, 201, 138, 0.2);
+    border-color: rgba(232, 201, 138, 0.6);
 }
 
 .lang-select option {
