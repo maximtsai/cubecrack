@@ -7,7 +7,7 @@ fixes can be applied to other Three.js games.
 **Part 1 (§0–§10)** is performance: making the frame rate acceptable.
 **Part 2 (§11–§15)** is robustness: making the game start and stay running at all. Both
 matter on the same hardware, and to the player both failures look the same.
-**Part 3 (§16–§23)** is interaction responsiveness, shader pre-warming, audio latency, responsive UI scaling, and motion damping.
+**Part 3 (§16–§24)** is interaction responsiveness, shader pre-warming, audio latency, particle batching, responsive UI scaling, and motion damping.
 
 The problem devices:
 
@@ -825,6 +825,19 @@ Aggressive screen shake and haptics can cause discomfort for motion-sensitive pl
 
 ---
 
+## 24. Batch point particles into pooled burst geometries (`THREE.Points` draw-call reduction)
+
+### The Problem
+Allocating an individual `THREE.Points` object for every single particle (where each particle owns its own `BufferGeometry([0, 0, 0])` and `PointsMaterial`) multiplies WebGL draw calls and GPU buffer transfers linearly with particle count. A single strike that uncovers a gem (spawning 12 impact sparks, 25 radiant reveal sparkles, and debris) spikes active draw calls by **37+ distinct `THREE.Points` draw calls** on that exact frame. Furthermore, each active particle sets `geometry.attributes.position.needsUpdate = true` every frame, causing 37 separate `gl.bufferSubData` GPU buffer uploads each frame. On mobile and integrated GPUs, CPU driver validation overhead across dozens of 1-vertex draw calls creates noticeable stutter and frame drops.
+
+### The Solution: Batched Burst Emitters with `setDrawRange`
+- **Pooled Multi-Point Emitters**: Each pooled particle system item allocates a single `BufferGeometry` with capacity for a full burst (e.g. 36 points) and a single `PointsMaterial`.
+- **Dynamic Draw Range**: On spawn, write all particle positions into the contiguous buffer array and call `geometry.setDrawRange(0, count)`. The entire burst renders in **1 single draw call**.
+- **Contiguous Buffer Updates**: During animation, update active particle velocities in a single loop and set `position.needsUpdate = true` **once per burst** instead of once per particle.
+- **Results**: Spawning 12 impact sparks and 18-25 reveal sparkles drops from 37+ separate draw calls down to **just 2 draw calls**, reducing particle draw calls and GPU buffer transfers by ~95%.
+
+---
+
 ## Checklist
 
 **Performance**
@@ -838,6 +851,7 @@ Aggressive screen shake and haptics can cause discomfort for motion-sensitive pl
 - [ ] `powerPreference: 'high-performance'`
 - [ ] Backdrop/skybox geometry tessellated to the minimum that avoids UV warping
 - [ ] Particles opaque; fade by scale, not opacity
+- [ ] Batch particle emitters into pooled multi-point `THREE.Points` buffers (`setDrawRange`) instead of 1 draw call per particle
 - [ ] No runtime mutation of shared materials
 - [ ] All emission on `dt` timers, never per-frame `Math.random()`
 - [ ] Effect budgets and cosmetic layers gated on tier
