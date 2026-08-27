@@ -5938,13 +5938,18 @@ uniform float uDim;
     }
 
     // ---------- frame loop ----------
-    const clock = new THREE.Clock();
+    // Timer, not Clock: Clock is deprecated as of r185 and warns on construction.
+    // The contract differs — Timer computes its delta once per update() call rather
+    // than measuring the gap between successive getDelta() calls — so tick() must
+    // update it exactly once, before anything reads dt or time.
+    const timer = new THREE.Timer();
     let rafId = 0;
     function tick() {
         rafId = requestAnimationFrame(tick);
         window._cubeRafId = rafId;
-        const dt = Math.min(clock.getDelta(), 0.05);
-        const time = clock.elapsedTime;
+        timer.update();
+        const dt = Math.min(timer.getDelta(), 0.05);
+        const time = timer.getElapsed();
 
         // Smoothly interpolate time scale. Snap once we're within an imperceptible
         // distance of the target — the lerp only converges asymptotically, so
@@ -6649,7 +6654,11 @@ uniform float uDim;
 
     function startLoop() {
         if (rafId) return;
-        clock.getDelta();
+        // Drop the time spent paused so the first frame back doesn't carry a huge dt.
+        // Timer.reset() rebases without folding the gap into the elapsed total, which
+        // is what the discarded read here was reaching for — Clock used to add the whole
+        // pause to elapsedTime as a side effect of throwing its delta away.
+        timer.reset();
         dirty = true; // repaint current state on resume
         rafId = requestAnimationFrame(tick);
         window._cubeRafId = rafId;
