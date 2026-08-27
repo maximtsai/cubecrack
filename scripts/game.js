@@ -279,7 +279,11 @@
     let renderer;
     try {
         renderer = new THREE.WebGLRenderer({
-            antialias: !tier.mobile,
+            // MSAA everywhere except the weak tier. Capable phones were previously
+            // lumped in with the slow ones and got no anti-aliasing of any kind —
+            // there is no FXAA/SMAA pass to fall back on. The resolution cap below
+            // is deliberately left alone, so this is the only smoothing mobile gets.
+            antialias: !tier.weak,
             alpha: true,
             powerPreference: 'high-performance',
             stencil: false,
@@ -6691,6 +6695,11 @@ uniform float uDim;
     // physics doesn't jump by a huge dt.
     function hostPause() {
         hostPaused = true;
+        // stopLoop() below halts the render loop, but CSS animations are driven by
+        // the compositor, not rAF — an infinite one like toolActivePulse would keep
+        // running for the whole time the game is backgrounded. §4.2 lists Animations
+        // separately from rendering loops for exactly this reason.
+        document.body.classList.add('host-paused');
         handleInputBlur();
         if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
             window.CubeCrackerAudio.pauseForVisibility('host');
@@ -6702,6 +6711,7 @@ uniform float uDim;
 
     function hostResume() {
         hostPaused = false;
+        document.body.classList.remove('host-paused');
         if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
             window.CubeCrackerAudio.resumeFromVisibility('host');
         }

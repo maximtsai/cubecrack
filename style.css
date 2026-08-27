@@ -855,6 +855,20 @@ body.ad-playing #overlay {
     pointer-events: none;
 }
 
+/* Host pause freezes every CSS animation. stopLoop() only ends the rAF loop; these
+   run on the compositor and would otherwise keep burning frames behind a backgrounded
+   game — toolActivePulse and toolBtnPendingPulse are infinite and never stop on their
+   own. play-state (not display/visibility) so nothing unwinds: each animation holds
+   its current frame and carries on from there on resume.
+
+   Transitions cannot be frozen this way, but they are all sub-second and simply run
+   to completion. */
+body.host-paused *,
+body.host-paused *::before,
+body.host-paused *::after {
+    animation-play-state: paused !important;
+}
+
 .card {
     text-align: center;
     display: flex;
