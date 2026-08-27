@@ -697,12 +697,14 @@ uniform float uDim;
             pool: [],
             free: [],
             createItem() {
+                const maxN = 36;
+                const arr = new Float32Array(maxN * 3);
                 const geo = new THREE.BufferGeometry();
-                const arr = new Float32Array([0, 0, 0]);
                 geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+                geo.setDrawRange(0, 0);
                 const mat = new THREE.PointsMaterial({
                     color: 0xffffff,
-                    size: 0.1,
+                    size: 0.22,
                     transparent: true,
                     opacity: 1.0,
                     map: glowTex,
@@ -712,7 +714,9 @@ uniform float uDim;
                 const points = new THREE.Points(geo, mat);
                 return {
                     points,
-                    vel: new THREE.Vector3(),
+                    vels: Array.from({ length: maxN }, () => new THREE.Vector3()),
+                    count: 0,
+                    baseSize: 0.22,
                     life: 0,
                     maxLife: 0.5,
                     inUse: false
@@ -738,6 +742,8 @@ uniform float uDim;
                 if (!item.inUse) return;
                 item.inUse = false;
                 item.life = 0;
+                item.count = 0;
+                item.points.geometry.setDrawRange(0, 0);
                 if (item.points.parent) {
                     item.points.parent.remove(item.points);
                 }
@@ -748,6 +754,8 @@ uniform float uDim;
                 for (const item of this.pool) {
                     item.inUse = false;
                     item.life = 0;
+                    item.count = 0;
+                    item.points.geometry.setDrawRange(0, 0);
                     if (item.points.parent) {
                         item.points.parent.remove(item.points);
                     }
@@ -759,7 +767,7 @@ uniform float uDim;
 
     ParticlePools.dusts.init(15);
     ParticlePools.cubeDusts.init(80);
-    ParticlePools.sparkles.init(80);
+    ParticlePools.sparkles.init(25);
     let collecting = [];    // {group, from, to, t, idx}
     let swing = null;
     let shake = 0;
@@ -3517,7 +3525,7 @@ uniform float uDim;
         flash(hitWorld);
 
         // Spawn impact sparks
-        spawnImpactSparks(hitWorld, 12);
+        spawnImpactSparks(hitWorld, 9);
 
         // Spawn floating juice text
         let { word, textColor } = impactWord();
@@ -3659,7 +3667,7 @@ uniform float uDim;
 
                 // Radiant burst of gem sparks on expose!
                 const gemWorldPos = t.group.localToWorld(new V3(0, 0, 0));
-                spawnSparkleBurst(gemWorldPos, t.sprite.material.color, 25);
+                spawnSparkleBurst(gemWorldPos, t.sprite.material.color, 18);
 
                 // Zelda unearthing floating text with matching gem color
                 const gemColorStyle = t.sprite.material.color.getStyle();
@@ -4592,7 +4600,7 @@ uniform float uDim;
             t.revealFlash = 1.0;
             CubeCrackerAudio.reveal();
             const wp = t.group.localToWorld(new V3(0, 0, 0));
-            spawnSparkleBurst(wp, t.sprite.material.color, 22);
+            spawnSparkleBurst(wp, t.sprite.material.color, 18);
             spawnJuiceText('UNEARTHED!!!', wp, t.sprite.material.color.getStyle(), '38px');
             if (!revealedOnce) {
                 revealedOnce = true;
@@ -5033,70 +5041,82 @@ uniform float uDim;
     }
 
     const _sparkColor = new THREE.Color();
-    function spawnImpactSparks(worldPos, count = 12) {
-        count = tieredCount(count);
+    function spawnImpactSparks(worldPos, count = 9) {
+        count = Math.min(tieredCount(count), 36);
+        if (count <= 0) return;
         _sparkColor.setHex(fxColor(FX_COLORS.spark));
-        for (let i = 0; i < count; i++) {
-            const item = ParticlePools.sparkles.get();
-            const arr = item.points.geometry.attributes.position.array;
-            arr[0] = worldPos.x;
-            arr[1] = worldPos.y;
-            arr[2] = worldPos.z;
-            item.points.geometry.attributes.position.needsUpdate = true;
+        const item = ParticlePools.sparkles.get();
+        item.count = count;
+        item.points.geometry.setDrawRange(0, count);
+        const arr = item.points.geometry.attributes.position.array;
 
-            item.points.material.color.copy(_sparkColor);
-            item.points.material.size = 0.14 + Math.random() * 0.14;
-            item.points.material.opacity = 1.0;
+        for (let i = 0; i < count; i++) {
+            arr[i * 3] = worldPos.x;
+            arr[i * 3 + 1] = worldPos.y;
+            arr[i * 3 + 2] = worldPos.z;
 
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.random() * Math.PI * 0.5; // hemispherical cone
             const speed = 1.5 + Math.random() * 3.0;
 
-            item.vel.set(
+            item.vels[i].set(
                 Math.sin(phi) * Math.cos(theta) * speed,
                 Math.sin(phi) * Math.sin(theta) * speed + 1.0, // slight upward lift
                 Math.cos(phi) * speed
             );
-
-            item.life = 0;
-            item.maxLife = 0.3 + Math.random() * 0.3;
-
-            fxGroup.add(item.points);
-            sparkles.push(item);
         }
+        item.points.geometry.attributes.position.needsUpdate = true;
+
+        item.points.material.color.copy(_sparkColor);
+        const s = 0.20 + Math.random() * 0.14;
+        item.baseSize = s;
+        item.points.material.size = s;
+        item.points.material.opacity = 1.0;
+
+        item.life = 0;
+        item.maxLife = 0.35 + Math.random() * 0.25;
+
+        fxGroup.add(item.points);
+        sparkles.push(item);
     }
 
-    function spawnSparkleBurst(worldPos, color, count = 20) {
-        count = tieredCount(count);
+    function spawnSparkleBurst(worldPos, color, count = 18) {
+        count = Math.min(tieredCount(count), 36);
+        if (count <= 0) return;
         const itemColor = color.isColor ? color : new THREE.Color(color);
-        for (let i = 0; i < count; i++) {
-            const item = ParticlePools.sparkles.get();
-            const arr = item.points.geometry.attributes.position.array;
-            arr[0] = worldPos.x;
-            arr[1] = worldPos.y;
-            arr[2] = worldPos.z;
-            item.points.geometry.attributes.position.needsUpdate = true;
+        const item = ParticlePools.sparkles.get();
+        item.count = count;
+        item.points.geometry.setDrawRange(0, count);
+        const arr = item.points.geometry.attributes.position.array;
 
-            item.points.material.color.copy(itemColor);
-            item.points.material.size = 0.12 + Math.random() * 0.12;
-            item.points.material.opacity = 1.0;
+        for (let i = 0; i < count; i++) {
+            arr[i * 3] = worldPos.x;
+            arr[i * 3 + 1] = worldPos.y;
+            arr[i * 3 + 2] = worldPos.z;
 
             // Shoot out radially
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(Math.random() * 2 - 1);
             const speed = 1.0 + Math.random() * 2.5;
-            item.vel.set(
+            item.vels[i].set(
                 Math.sin(phi) * Math.cos(theta) * speed,
                 Math.sin(phi) * Math.sin(theta) * speed,
                 Math.cos(phi) * speed
             );
-
-            item.life = 0;
-            item.maxLife = 0.6 + Math.random() * 0.5;
-
-            fxGroup.add(item.points);
-            sparkles.push(item);
         }
+        item.points.geometry.attributes.position.needsUpdate = true;
+
+        item.points.material.color.copy(itemColor);
+        const s = 0.18 + Math.random() * 0.12;
+        item.baseSize = s;
+        item.points.material.size = s;
+        item.points.material.opacity = 1.0;
+
+        item.life = 0;
+        item.maxLife = 0.55 + Math.random() * 0.45;
+
+        fxGroup.add(item.points);
+        sparkles.push(item);
     }
 
     const _juicePool = [];
@@ -5147,18 +5167,12 @@ uniform float uDim;
             y -= 30;
             el.className = 'juice-text ' + variant;
             el.style.color = '#ffffff';
-            el.style.textShadow = `
-                        0 0 6px #ffffff,
-                        0 0 15px ${color},
-                        0 0 30px ${color},
-                        0 0 45px ${color},
-                        3px 3px 5px rgba(0, 0, 0, 0.95),
-                        5px 5px 15px rgba(0, 0, 0, 0.9)
-                    `;
+            // Simplified crisp 2-layer text shadow: avoids expensive multi-layer wide Gaussian blurs
+            el.style.textShadow = `0 0 8px ${color}, 2px 2px 4px rgba(0, 0, 0, 0.9)`;
         } else {
             el.className = 'juice-text';
             el.style.color = color;
-            el.style.textShadow = `0 0 10px ${color}, 0 0 20px rgba(0,0,0,0.85)`;
+            el.style.textShadow = `0 0 6px ${color}, 1px 1px 3px rgba(0, 0, 0, 0.85)`;
         }
         el.textContent = text;
         el.style.left = `${x}px`;
@@ -5278,7 +5292,8 @@ uniform float uDim;
 
     function spawnSparkle(pos, color) {
         const item = ParticlePools.sparkles.get();
-
+        item.count = 1;
+        item.points.geometry.setDrawRange(0, 1);
         const arr = item.points.geometry.attributes.position.array;
         arr[0] = pos.x;
         arr[1] = pos.y;
@@ -5286,10 +5301,12 @@ uniform float uDim;
         item.points.geometry.attributes.position.needsUpdate = true;
 
         item.points.material.color.copy(color);
-        item.points.material.size = 0.08 + Math.random() * 0.08;
+        const s = 0.12 + Math.random() * 0.08;
+        item.baseSize = s;
+        item.points.material.size = s;
         item.points.material.opacity = 1.0;
 
-        item.vel.set(
+        item.vels[0].set(
             (Math.random() - 0.5) * 0.4,
             (Math.random() - 0.5) * 0.4,
             (Math.random() - 0.5) * 0.4
@@ -6214,14 +6231,19 @@ uniform float uDim;
             for (let i = sparkles.length - 1; i >= 0; i--) {
                 const sp = sparkles[i];
                 sp.life += scaledDt;
-                sp.vel.multiplyScalar(sparkDrag);
                 const arr = sp.points.geometry.attributes.position.array;
-                arr[0] += sp.vel.x * scaledDt;
-                arr[1] += sp.vel.y * scaledDt;
-                arr[2] += sp.vel.z * scaledDt;
+                const count = sp.count;
+                for (let j = 0; j < count; j++) {
+                    const v = sp.vels[j];
+                    v.multiplyScalar(sparkDrag);
+                    arr[j * 3] += v.x * scaledDt;
+                    arr[j * 3 + 1] += v.y * scaledDt;
+                    arr[j * 3 + 2] += v.z * scaledDt;
+                }
                 sp.points.geometry.attributes.position.needsUpdate = true;
                 const k = sp.life / sp.maxLife;
-                sp.points.material.opacity = 1.0 - k;
+                sp.points.material.opacity = Math.max(1.0 - k, 0);
+                sp.points.material.size = Math.max(sp.baseSize * (1.0 - k * 0.35), 0.001);
                 if (k >= 1.0) {
                     ParticlePools.sparkles.release(sp);
                     sparkles.splice(i, 1);
