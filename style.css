@@ -826,6 +826,18 @@ body.ad-active #options-btn {
     pointer-events: none;
 }
 
+/* A break that is actually on screen additionally hides the win card, which would
+   otherwise sit behind the ad for its whole duration with its buttons still live.
+   visibility, not opacity: #overlay carries a 0.45s opacity transition for its
+   normal show/hide, and this must be instant rather than fading out under an ad
+   that has already covered the frame. visibility is not in that transition list,
+   so it cuts. Keyed to 'ad-playing' rather than 'ad-active' on purpose — see
+   setAdPlaying() — so an ad request that never fills leaves the card up. */
+body.ad-playing #overlay {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .card {
     text-align: center;
     display: flex;

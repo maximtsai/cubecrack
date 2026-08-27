@@ -788,6 +788,16 @@ uniform float uDim;
     let adPausedOwner = null; // null | 'interstitial' | 'rewarded'
     let hostPaused = false;
     let adInFlight = false;
+    // Distinct from 'ad-active', which covers the whole REQUEST — including a fill
+    // that never arrives. This tracks only a break that is genuinely painted over
+    // the game, so UI hidden behind an ad is never hidden while nothing is there to
+    // hide it behind (a request that times out would otherwise blank the win card
+    // for the full 10s wait). Driven from pauseForAd/resumeAfterAd, which are the
+    // onStarted / onFinished edges.
+    function setAdPlaying(on) {
+        document.body.classList.toggle('ad-playing', !!on);
+    }
+
     function setAdInFlight(active) {
         adInFlight = !!active;
         if (active) {
@@ -934,6 +944,7 @@ uniform float uDim;
         const resumeAfterAd = () => {
             if (adPausedOwner !== 'rewarded') return;
             adPausedOwner = null;
+            setAdPlaying(false);
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
                 window.CubeCrackerAudio.resumeFromVisibility('ad');
             }
@@ -944,6 +955,7 @@ uniform float uDim;
         const pauseForAd = () => {
             if (adPausedOwner) return;
             adPausedOwner = 'rewarded';
+            setAdPlaying(true);
             handleInputBlur();
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
                 window.CubeCrackerAudio.pauseForVisibility('ad');
@@ -1712,6 +1724,7 @@ uniform float uDim;
         for (const c of chunks) {
             if (!c.alive || gemChunks.has(c)) continue;
             if (c.kind === 'dirt') continue; // dirt clumps are the gems' own wrapping
+            if (!clearOfBlocks(c.centroid)) continue; // avoid metal cubes, same as gems
             pool.push(c);
         }
         if (!pool.length) return null;
@@ -6451,6 +6464,7 @@ uniform float uDim;
         const resumeAfterAd = () => {
             if (adPausedOwner !== 'interstitial') return;
             adPausedOwner = null;
+            setAdPlaying(false);
             // Always released, even under a host pause — the audio layer holds the
             // context down for as long as the 'host' hold is outstanding.
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.resumeFromVisibility) {
@@ -6462,6 +6476,7 @@ uniform float uDim;
         const pauseForAd = () => {
             if (adPausedOwner) return;
             adPausedOwner = 'interstitial';
+            setAdPlaying(true);
             handleInputBlur();
             if (window.CubeCrackerAudio && window.CubeCrackerAudio.pauseForVisibility) {
                 window.CubeCrackerAudio.pauseForVisibility('ad');
