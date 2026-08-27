@@ -37,7 +37,7 @@
     <div id="star-glow"></div>
 
     <button id="level-select-btn" class="level-select-btn" aria-label="Select level"><span
-            id="level-select-label">LEVELS</span></button>
+            id="level-select-label">LEVELS</span><span id="level-par" aria-live="polite"></span></button>
 
     <div id="level-overlay" class="modal-overlay">
         <div class="options-card" style="width: calc(100% - 32px); max-width: 680px;">
@@ -172,7 +172,15 @@
             <p id="winRank" aria-live="polite"></p>
             <p id="winBest"></p>
             <p id="winRing"></p>
-            <button id="again">NEXT TRIAL</button>
+            <p id="winRetryPrompt"></p>
+            <div id="win-actions">
+                <button type="button" id="winRetry" aria-label="Retry level">
+                    <svg viewBox="0 0 24 24" class="retry-icon" aria-hidden="true">
+                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-8 8s3.57 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                    </svg>
+                </button>
+                <button id="again">NEXT TRIAL</button>
+            </div>
         </div>
         <div class="card" id="endCard">
             <h2 id="endTitle">CHAMPIONSHIP COMPLETE</h2>
@@ -183,6 +191,8 @@
             <div id="totalStats">
                 <span class="total-part">TOTAL HITS: <span id="totalHitsCount" class="total-count">0</span></span>
                 <span class="total-part total-part-stars">STARS: <span id="totalStarsCount"
+                        class="total-count">0</span></span>
+                <span class="total-part total-part-rings">◎ RINGS: <span id="totalRingsCount"
                         class="total-count">0</span></span>
             </div>
 

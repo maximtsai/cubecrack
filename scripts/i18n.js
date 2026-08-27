@@ -58,6 +58,10 @@ function currentSaveRecord() {
         v: SAVE_VERSION,
         bestScores: window.bestScores,
         ringsFound: window.ringsFound,
+        // Where to drop a returning player back in. Sessions on a portal are short
+        // and cut off without warning, so restarting everyone at the Stone Cube
+        // throws away real progress every time they come back.
+        level: typeof window.level === 'number' ? window.level : 0,
         settings: {
             masterVolume: window.masterVolume,
             musicVolume: window.musicVolume,
@@ -96,6 +100,9 @@ window.saveGameSettings = function () { window.persistGameState(); };
 // throw that away.
 window.applySavedState = function (state) {
     saveLoaded = true;
+    // Cleared up front so a failed or absent load leaves no stale value behind for
+    // the resume to act on, rather than leaning on the caller to type-check it.
+    window.savedLevel = null;
     if (!state || typeof state !== 'object') return;
 
     if (Array.isArray(state.bestScores)) {
@@ -111,6 +118,11 @@ window.applySavedState = function (state) {
             if (state.ringsFound[i]) window.ringsFound[i] = true;
         }
     }
+
+    // Only recorded here, never acted on: the game boots synchronously long before
+    // this lands, and it alone knows whether the player has already started swinging
+    // at the level it opened on. bootPlatform decides whether the jump is still safe.
+    window.savedLevel = Number.isInteger(state.level) && state.level >= 0 ? state.level : null;
 
     const st = state.settings;
     if (st && typeof st === 'object') {
@@ -194,6 +206,9 @@ window.TRANSLATIONS = {
         eggHint: "Shell regenerates. Break quickly.",
         gemsClaimed: "all gems claimed in {strikes} strikes",
         nextTrial: "NEXT TRIAL",
+        skipLevel: "SKIP",
+        retryLevel: "RETRY",
+        retryPrompt: "COLLECT ALL 3 STARS?",
         startOver: "START OVER",
         settings: "SETTINGS",
         sfxVolume: "SFX VOLUME",
@@ -204,6 +219,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "GAME SCOREBOARD",
         totalHitsLabel: "TOTAL HITS: {total}",
         totalStarsLabel: "STARS: {stars}",
+        totalRingsLabel: "RINGS: {rings}",
         bestScoreLabel: "BEST: {strikes}",
         secretRingLabel: "SECRET RING FOUND",
         rankGoldLabel: "GOLD RANK",
@@ -213,6 +229,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "STRIKES:",
 
         levelsLabel: "LEVELS",
+        parLabel: "PAR: {strikes}",
         selectLevelTitle: "SELECT LEVEL",
         newToolLabel: "NEW TOOL!",
         hammerToolName: "HAMMER",
@@ -288,6 +305,9 @@ window.TRANSLATIONS = {
         eggHint: "la cáscara se regenera. rompe rápido.",
         gemsClaimed: "todas las gemas obtenidas en {strikes} golpes",
         nextTrial: "SIGUIENTE PRUEBA",
+        skipLevel: "SALTAR",
+        retryLevel: "REINTENTAR",
+        retryPrompt: "¿CONSEGUIR LAS 3 ESTRELLAS?",
         startOver: "RECOMENZAR",
         settings: "AJUSTES",
         sfxVolume: "VOLUMEN SFX",
@@ -298,6 +318,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "TABLA DE PUNTUACIÓN",
         totalHitsLabel: "GOLPES TOTALES: {total}",
         totalStarsLabel: "ESTRELLAS: {stars}",
+        totalRingsLabel: "ANILLOS: {rings}",
         bestScoreLabel: "MEJOR: {strikes}",
         secretRingLabel: "ANILLO SECRETO ENCONTRADO",
         rankGoldLabel: "RANGO ORO",
@@ -307,6 +328,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "GOLPES:",
 
         levelsLabel: "NIVELES",
+        parLabel: "OBJETIVO: {strikes}",
         selectLevelTitle: "SELECCIONAR NIVEL",
         newToolLabel: "¡NUEVA HERRAMIENTA!",
         hammerToolName: "MARTILLO",
@@ -382,6 +404,9 @@ window.TRANSLATIONS = {
         eggHint: "la coquille se régénère. brisez vite.",
         gemsClaimed: "toutes les gemmes récupérées en {strikes} coups",
         nextTrial: "PROCHAIN ESSAI",
+        skipLevel: "PASSER",
+        retryLevel: "RÉESSAYER",
+        retryPrompt: "OBTENIR LES 3 ÉTOILES ?",
         startOver: "RECOMMENCER",
         settings: "RÉGLAGES",
         sfxVolume: "VOLUME SFX",
@@ -392,6 +417,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "TABLEAU DES SCORES",
         totalHitsLabel: "TOTAL DES COUPS : {total}",
         totalStarsLabel: "ÉTOILES : {stars}",
+        totalRingsLabel: "ANNEAUX : {rings}",
         bestScoreLabel: "MEILLEUR : {strikes}",
         secretRingLabel: "ANNEAU SECRET TROUVÉ",
         rankGoldLabel: "RANG OR",
@@ -401,6 +427,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "COUPS:",
 
         levelsLabel: "NIVEAUX",
+        parLabel: "OBJECTIF : {strikes}",
         selectLevelTitle: "CHOISIR UN NIVEAU",
         newToolLabel: "NOUVEL OUTIL !",
         hammerToolName: "MARTEAU",
@@ -476,6 +503,9 @@ window.TRANSLATIONS = {
         eggHint: "蛋壳会再生，快速破开",
         gemsClaimed: "集齐所有宝石，总共锤击 {strikes} 次",
         nextTrial: "下一关",
+        skipLevel: "跳过",
+        retryLevel: "重试",
+        retryPrompt: "收集全部3颗星？",
         startOver: "重新开始",
         settings: "设置",
         sfxVolume: "音效音量",
@@ -486,6 +516,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "游戏计分板",
         totalHitsLabel: "总锤击数: {total}",
         totalStarsLabel: "星星: {stars}",
+        totalRingsLabel: "金环: {rings}",
         bestScoreLabel: "最佳: {strikes}",
         secretRingLabel: "发现秘密金环",
         rankGoldLabel: "金牌评级",
@@ -495,6 +526,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "锤击：",
 
         levelsLabel: "关卡",
+        parLabel: "目标：{strikes}",
         selectLevelTitle: "选择关卡",
         newToolLabel: "新工具！",
         hammerToolName: "锤子",
@@ -570,6 +602,9 @@ window.TRANSLATIONS = {
         eggHint: "蛋殼會再生，快速破開",
         gemsClaimed: "集齊所有寶石，總共錘擊 {strikes} 次",
         nextTrial: "下一關",
+        skipLevel: "跳過",
+        retryLevel: "重試",
+        retryPrompt: "收集全部3顆星？",
         startOver: "重新開始",
         settings: "設定",
         sfxVolume: "音效音量",
@@ -580,6 +615,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "遊戲計分板",
         totalHitsLabel: "總錘擊數: {total}",
         totalStarsLabel: "星星: {stars}",
+        totalRingsLabel: "金環: {rings}",
         bestScoreLabel: "最佳: {strikes}",
         secretRingLabel: "發現秘密金環",
         rankGoldLabel: "金牌評級",
@@ -589,6 +625,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "錘擊：",
 
         levelsLabel: "關卡",
+        parLabel: "目標：{strikes}",
         selectLevelTitle: "選擇關卡",
         newToolLabel: "新工具！",
         hammerToolName: "錘子",
@@ -664,6 +701,9 @@ window.TRANSLATIONS = {
         eggHint: "القشرة تتجدد. اكسرها بسرعة.",
         gemsClaimed: "تم جمع كل الجواهر في {strikes} ضربة",
         nextTrial: "التجربة التالية",
+        skipLevel: "تخطي",
+        retryLevel: "إعادة",
+        retryPrompt: "اجمع النجوم الثلاث؟",
         startOver: "البدء من جديد",
         settings: "الإعدادات",
         sfxVolume: "صوت المؤثرات",
@@ -674,6 +714,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "لوحة النتائج",
         totalHitsLabel: "إجمالي الضربات: {total}",
         totalStarsLabel: "النجوم: {stars}",
+        totalRingsLabel: "الحلقات: {rings}",
         bestScoreLabel: "الأفضل: {strikes}",
         secretRingLabel: "تم العثور على الحلقة السرية",
         rankGoldLabel: "رتبة ذهبية",
@@ -683,6 +724,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "الضربات:",
 
         levelsLabel: "المستويات",
+        parLabel: "الهدف: {strikes}",
         selectLevelTitle: "اختر المستوى",
         newToolLabel: "أداة جديدة!",
         hammerToolName: "المطرقة",
@@ -758,6 +800,9 @@ window.TRANSLATIONS = {
         eggHint: "खोल फिर भर जाता है। जल्दी तोड़ें।",
         gemsClaimed: "सभी रत्न {strikes} प्रहारों में प्राप्त",
         nextTrial: "अगली चुनौती",
+        skipLevel: "छोड़ें",
+        retryLevel: "पुनः प्रयास",
+        retryPrompt: "तीनों सितारे पाएँ?",
         startOver: "फिर से शुरू करें",
         settings: "सेटिंग्स",
         sfxVolume: "ध्वनि प्रभाव",
@@ -768,6 +813,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "स्कोरबोर्ड",
         totalHitsLabel: "कुल प्रहार: {total}",
         totalStarsLabel: "सितारे: {stars}",
+        totalRingsLabel: "अंगूठियाँ: {rings}",
         bestScoreLabel: "सर्वश्रेष्ठ: {strikes}",
         secretRingLabel: "गुप्त सुनहरी अंगूठी मिली",
         rankGoldLabel: "स्वर्ण रैंक",
@@ -777,6 +823,7 @@ window.TRANSLATIONS = {
         levelStrikesLabel: "प्रहार:",
 
         levelsLabel: "स्तर",
+        parLabel: "लक्ष्य: {strikes}",
         selectLevelTitle: "स्तर चुनें",
         newToolLabel: "नया उपकरण!",
         hammerToolName: "हथौड़ा",
@@ -852,6 +899,9 @@ window.TRANSLATIONS = {
         eggHint: "殻は再生する。素早く壊そう。",
         gemsClaimed: "すべての宝石を{strikes}回の攻撃で獲得",
         nextTrial: "次の試練",
+        skipLevel: "スキップ",
+        retryLevel: "リトライ",
+        retryPrompt: "スター3つを獲得？",
         startOver: "最初から",
         settings: "設定",
         sfxVolume: "効果音音量",
@@ -862,6 +912,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "スコアボード",
         totalHitsLabel: "総攻撃回数: {total}",
         totalStarsLabel: "スター: {stars}",
+        totalRingsLabel: "指輪: {rings}",
         bestScoreLabel: "ベスト: {strikes}",
         secretRingLabel: "秘密の指輪を発見",
         rankGoldLabel: "ゴールドランク",
@@ -870,6 +921,7 @@ window.TRANSLATIONS = {
         levelHitsLabel: "{hits}回",
         levelStrikesLabel: "攻撃:",
         levelsLabel: "レベル",
+        parLabel: "目標: {strikes}",
         selectLevelTitle: "レベルを選択",
         newToolLabel: "新ツール！",
         hammerToolName: "ハンマー",
@@ -945,6 +997,9 @@ window.TRANSLATIONS = {
         eggHint: "скорлупа восстанавливается. Разбивайте быстро.",
         gemsClaimed: "все самоцветы получены за {strikes} ударов",
         nextTrial: "СЛЕДУЮЩЕЕ ИСПЫТАНИЕ",
+        skipLevel: "ПРОПУСТИТЬ",
+        retryLevel: "ЗАНОВО",
+        retryPrompt: "СОБРАТЬ ВСЕ 3 ЗВЕЗДЫ?",
         startOver: "НАЧАТЬ ЗАНОВО",
         settings: "НАСТРОЙКИ",
         sfxVolume: "ГРОМКОСТЬ ЭФФЕКТОВ",
@@ -955,6 +1010,7 @@ window.TRANSLATIONS = {
         gameScoreboard: "ТАБЛИЦА РЕЗУЛЬТАТОВ",
         totalHitsLabel: "ВСЕГО УДАРОВ: {total}",
         totalStarsLabel: "ЗВЁЗДЫ: {stars}",
+        totalRingsLabel: "КОЛЬЦА: {rings}",
         bestScoreLabel: "ЛУЧШИЙ: {strikes}",
         secretRingLabel: "СЕКРЕТНОЕ КОЛЬЦО НАЙДЕНО",
         rankGoldLabel: "ЗОЛОТОЙ РАНГ",
@@ -963,6 +1019,7 @@ window.TRANSLATIONS = {
         levelHitsLabel: "{hits} УДАРОВ",
         levelStrikesLabel: "УДАРЫ:",
         levelsLabel: "УРОВНИ",
+        parLabel: "ЦЕЛЬ: {strikes}",
         selectLevelTitle: "ВЫБЕРИТЕ УРОВЕНЬ",
         newToolLabel: "НОВЫЙ ИНСТРУМЕНТ!",
         hammerToolName: "МОЛОТ",
@@ -1070,6 +1127,7 @@ window.applyTranslations = function () {
     // Level Select button + list
     const levelLabel = document.getElementById('level-select-label');
     if (levelLabel) levelLabel.textContent = window._t('levelsLabel');
+    if (window.updateLevelPar) window.updateLevelPar();
     const levelTitle = document.getElementById('level-title');
     if (levelTitle) levelTitle.textContent = window._t('selectLevelTitle');
     const levelClose = document.getElementById('level-close');
@@ -1111,12 +1169,8 @@ window.applyTranslations = function () {
     if (levelStrikesCount) levelStrikesCount.textContent = visibleStrikeCount;
     if (levelStrikes) levelStrikes.classList.toggle('is-zero', !(visibleStrikeCount > 0));
 
-    // Next Trial button
-    const againBtn = document.getElementById('again');
-    if (againBtn && window.level !== undefined && window.LEVELS !== undefined) {
-        const isLast = window.level === window.LEVELS.length - 1;
-        againBtn.textContent = isLast ? window._t('startOver') : window._t('nextTrial');
-    }
+    // Forward button + the retry offer beside it: one painter, one condition.
+    if (window.paintWinRetry) window.paintWinRetry();
 
     // Settings Panel texts
     document.getElementById('settings-title').textContent = window._t('settings');
@@ -1176,11 +1230,14 @@ window.applyTranslations = function () {
         };
         const hits = carry('totalHitsCount', window.runTotalHits());
         const stars = carry('totalStarsCount', window.totalStars(window.hitsPerLevel));
+        const rings = carry('totalRingsCount', window.ringTallyText());
         totalStats.innerHTML =
             '<span class="total-part">' +
             window._t('totalHitsLabel', { total: `<span id="totalHitsCount" class="total-count${hits.cls}">${hits.text}</span>` }) +
             '</span><span class="total-part total-part-stars">' +
             window._t('totalStarsLabel', { stars: `<span id="totalStarsCount" class="total-count${stars.cls}">${stars.text}</span>` }) +
+            '</span><span class="total-part total-part-rings">◎ ' +
+            window._t('totalRingsLabel', { rings: `<span id="totalRingsCount" class="total-count${rings.cls}">${rings.text}</span>` }) +
             '</span>';
     }
 
@@ -1249,6 +1306,17 @@ window.rankStarsText = function (rank) {
     return '★★★☆☆☆'.slice(3 - n, 6 - n);
 };
 
+// Par readout under the LEVELS control: the strike budget for a three-star clear of
+// the level being played. Read through starRankFor so it can never disagree with the
+// tier the win card awards — including on a level with no authored thresholds, where
+// both fall back to the same default.
+window.updateLevelPar = function () {
+    const el = document.getElementById('level-par');
+    if (!el) return;
+    if (typeof window.level !== 'number') { el.textContent = ''; return; }
+    el.textContent = window._t('parLabel', { strikes: window.starRankFor(window.level, 0).gold });
+};
+
 window.rankRowMarkup = function (levelIdx, hits) {
     if (hits == null) return ''; // never played: nothing to rate
     const rank = window.starRankFor(levelIdx, hits);
@@ -1272,6 +1340,29 @@ window.totalStars = function (scores) {
 // because the platform sorts highest-first and requires the submitted score to
 // match the player's best result in save data — and because stars only ever go
 // up, which a run-scoped total would not.
+// Secret rings collected across every level that hides one. Unlike the hits and
+// stars beside it on the scoreboard, this is an ALL-TIME tally read from save data:
+// a ring is a permanent collectible, and the level-select cards already report it
+// that way. The denominator is derived from the level table rather than hardcoded,
+// so a level authored with `noRing` never inflates the target.
+window.ringTally = function () {
+    const levels = window.LEVELS || [];
+    const found = window.ringsFound || [];
+    let got = 0, total = 0;
+    for (let i = 0; i < levels.length; i++) {
+        if (levels[i] && levels[i].noRing) continue;
+        total++;
+        if (found[i]) got++;
+    }
+    return { found: got, total };
+};
+
+// Rendered as "7 / 13" wherever the tally is shown.
+window.ringTallyText = function () {
+    const t = window.ringTally();
+    return t.found + ' / ' + t.total;
+};
+
 window.submitStarScore = function () {
     if (!window.GameSDK) return;
     window.GameSDK.setScore(window.totalStars(window.bestScores));
@@ -1290,6 +1381,33 @@ window.hitsCellMarkup = function (levelIdx) {
     if (hits == null) return '<span style="font-family: monospace; color: var(--dim);">—</span>';
     const label = window._t('levelHitsLabel', { hits });
     return `<span style="font-family: monospace; color: var(--gold);">${label}${window.rankRowMarkup(levelIdx, hits)}</span>`;
+};
+
+// The retry offer on the win card. Shown only when the clear came in under three
+// stars, and painted as ONE state — the prompt above the star row, the retry circle,
+// and SKIP replacing NEXT TRIAL all key off the same condition, so the card can never
+// show a retry button next to a button that still says NEXT TRIAL. With nothing left
+// to earn the row collapses back to the single full-width button it has always been.
+window.paintWinRetry = function () {
+    const prompt = document.getElementById('winRetryPrompt');
+    const retry = document.getElementById('winRetry');
+    const again = document.getElementById('again');
+    const rank = window.currentRank;
+    const style = rank && window.RANK_STYLE[rank.tier];
+    const canImprove = !!style && style.stars < 3;
+    if (prompt) {
+        prompt.textContent = canImprove ? window._t('retryPrompt') : '';
+        prompt.style.display = canImprove ? '' : 'none';
+    }
+    if (retry) {
+        retry.style.display = canImprove ? '' : 'none';
+        retry.setAttribute('aria-label', window._t('retryLevel'));
+    }
+    if (again && window.level !== undefined && window.LEVELS !== undefined) {
+        const isLast = window.level === window.LEVELS.length - 1;
+        again.textContent = canImprove ? window._t('skipLevel')
+            : (isLast ? window._t('startOver') : window._t('nextTrial'));
+    }
 };
 
 // Paints the big star row + tier label on the win card from window.currentRank.
@@ -1323,23 +1441,23 @@ window.LEVEL_NAME_KEYS = window.I18N.levelNameKeys;
 
 window.ringsFound = Array(14).fill(false);
 
-// Star-rank thresholds, per level.
+// Star-rank thresholds, per level. Silver is always at least 80% more than gold (>= gold * 1.8).
 window.gameConfig = {
     starRanks: [
-        { gold: 6, silver: 10 },
-        { gold: 8, silver: 12 },
-        { gold: 8, silver: 14 },
+        { gold: 9, silver: 18 },
+        { gold: 10, silver: 20 },
+        { gold: 10, silver: 20 },
         { gold: 10, silver: 18 },
-        { gold: 8, silver: 13 },
+        { gold: 8, silver: 15 },
         { gold: 6, silver: 12 },
-        { gold: 8, silver: 14 },
+        { gold: 8, silver: 15 },
         { gold: 8, silver: 20 },
         { gold: 10, silver: 20 },
-        { gold: 8, silver: 16 },
+        { gold: 6, silver: 14 },
         { gold: 10, silver: 20 },
         { gold: 7, silver: 16 },
         { gold: 5, silver: 10 },
-        { gold: 15, silver: 26 }
+        { gold: 16, silver: 29 }
     ]
 };
 

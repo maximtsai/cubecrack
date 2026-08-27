@@ -923,11 +923,11 @@ body.ad-active #options-btn {
 
 .win-star:nth-child(2).earned {
     animation: winStarPopCenter 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    animation-delay: 0.45s;
+    animation-delay: 0.40s;
 }
 
 .win-star:nth-child(3).earned {
-    animation-delay: 0.75s;
+    animation-delay: 0.65s;
 }
 
 @keyframes winStarIn {
@@ -1091,6 +1091,88 @@ body.ad-active #options-btn {
     box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 8) rgba(0, 0, 0, 0.6);
 }
 
+/* Lead-in to the action row, sitting under the secret-ring line. The negative bottom
+   margin eats into the card's own 16u gap so it reads as a label ON the buttons below
+   it rather than floating equidistant between them and the ring line above. */
+#winRetryPrompt {
+    font-family: Cinzel, serif;
+    font-size: calc(var(--u) * 18);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-indent: 0.16em;
+    text-transform: uppercase;
+    color: rgba(232, 201, 138, 0.75);
+    margin: 0 0 calc(var(--u) * -14) 0;
+}
+
+/* Win-card action row. The row carries the top margin the lone button used to own,
+   so a gold clear — where the retry circle is display:none — lays out exactly as it
+   did before this row existed. */
+#win-actions {
+    display: flex;
+    /* center, not stretch: the circle has a fixed height, so in a locale whose glyphs
+       make the button taller (Devanagari, kana) stretch would leave it pinned to the
+       top of the row instead of level with the button beside it. */
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--u) * 14);
+    width: 100%;
+    max-width: calc(var(--u) * 340);
+    margin-top: calc(var(--u) * 12);
+}
+
+#win-actions button {
+    margin-top: 0;
+}
+
+/* shrinks to make room for the retry circle, and takes the whole row without it */
+#again {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Only once the retry circle is actually beside it: the narrowed pill has to hold a
+   word like ПРОПУСТИТЬ, which overflows at the full-width button's letter-spacing and
+   padding. Trades both back for room, and allows a break inside a single long word
+   rather than letting it spill past the pill's own edge. */
+#win-actions.has-retry #again {
+    padding-left: calc(var(--u) * 12);
+    padding-right: calc(var(--u) * 12);
+    letter-spacing: 0.10em;
+    text-indent: 0.10em;
+    overflow-wrap: anywhere;
+}
+
+/* Retry: the circular-control idiom the tool bar already uses — dark well, gold rim,
+   gold glyph — so it reads as an action rather than a second primary button competing
+   with SKIP beside it. */
+#winRetry {
+    flex: 0 0 auto;
+    width: calc(var(--u) * 68);
+    height: calc(var(--u) * 68);
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(34, 29, 24, 0.65);
+    border: calc(var(--u) * 2) solid rgba(232, 201, 138, 0.5);
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 18) rgba(0, 0, 0, 0.45);
+}
+
+#winRetry:hover {
+    background: rgba(34, 29, 24, 0.85);
+    border-color: var(--gold);
+    box-shadow: 0 calc(var(--u) * 8) calc(var(--u) * 22) rgba(232, 201, 138, 0.35);
+}
+
+.retry-icon {
+    width: 58%;
+    height: 58%;
+    fill: currentColor;
+}
+
 /* loading screen */
 #loader {
     position: fixed;
@@ -1209,6 +1291,30 @@ body.ad-active #options-btn {
     justify-content: center;
     white-space: nowrap;
     transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Par readout: this level's gold-star strike budget, so a run has a visible target
+   instead of a counter that only climbs. Positioned absolutely rather than stacked
+   in the button's flex column — the LEVELS pill has to stay on the button's vertical
+   centre, where it lines up with the options gear opposite it, and a second line in
+   the flow would shove it upward. */
+#level-par {
+    position: absolute;
+    /* half the pill's height, plus a small gap */
+    top: calc(50% + calc(var(--u) * 34) + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: Cinzel, serif;
+    font-size: calc(var(--u) * 18);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.12em;
+    text-indent: 0.12em;
+    white-space: nowrap;
+    color: rgba(232, 201, 138, 0.55);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0, 0, 0, 0.9);
+    pointer-events: none;
 }
 
 .level-select-btn:hover {
@@ -1690,6 +1796,12 @@ body.intro-hide-ui #options-btn {
 
 /* the star tally is the ranked value, so it carries the accent */
 .total-part-stars {
+    color: #ffd166;
+}
+
+/* the ring tally is a collectible, not a ranked value, so it carries the ring
+   accent it already wears on the win card and the level-select cards */
+.total-part-rings {
     color: #ffd166;
 }
 

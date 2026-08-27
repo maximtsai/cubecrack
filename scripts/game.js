@@ -56,7 +56,7 @@
             sizeMul: ICE_SIZE * 1.35 * 0.88 * 1.5 * ICE_GROW * 0.88, cam: ICE_SIZE * 0.75 * 1.5 * 1.15 * ICE_CAM * 0.84 * 0.95, chunkMul: 0.18 * 1.5 * 1.5 * 1.5 * ICE_GROW * ICE_GROW * ICE_GROW,
             // Fixed anchors keep the three gems in separate lobes / lower point of the heart,
             // with generous 3D clearance from both the vertical and horizontal metal rods.
-            gemLayout: [[-0.44, 0.25, -0.15], [0.44, 0.25, -0.15], [0, -0.50, -0.40]],
+            gemLayout: [[-0.44, 0.25, -0.15], [0.44, 0.25, -0.15], [0, -0.28, -0.10]],
             bg: 'radial-gradient(120% 90% at 50% 38%, #471a59 0%, #251138 55%, #13091e 100%)'
         },
         {
@@ -583,13 +583,13 @@ uniform float uDim;
             pool: [],
             free: [],
             createItem() {
-                const N = 6;
+                const N = 4;
                 const arr = new Float32Array(N * 3);
                 const geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
                 const mat = new THREE.PointsMaterial({
                     color: 0xcbb89a,
-                    size: 0.11
+                    size: 0.22
                 });
                 const points = new THREE.Points(geo, mat);
                 return {
@@ -2786,6 +2786,10 @@ uniform float uDim;
         fxUniforms.uDim.value = 1; // shared: every other level stays fully lit
         if (starGlowEl) starGlowEl.style.opacity = '0';
         strikes = 0; collectedCount = 0; gameOver = false; revealedOnce = false; window.strikes = strikes; window.level = level; window.LEVELS = LEVELS;
+        // Bank the new level so a returning player resumes here. Debounced, and a
+        // no-op until the initial load has landed, so the boot build() can't write
+        // level 0 over a real record before it has been read back.
+        if (window.persistGameState) window.persistGameState();
         if (window.CubeCrackerAudio) CubeCrackerAudio.updateMusicForLevel(level);
         updateLevelStrikeCounter();
         idleHint = 0; ghostPhase = 0;
@@ -4971,7 +4975,7 @@ uniform float uDim;
 
     function spawnDust(pos, n) {
         const item = ParticlePools.dusts.get();
-        const N = 6;
+        const N = 4;
         const arr = item.points.geometry.attributes.position.array;
         for (let i = 0; i < N; i++) {
             arr[i * 3] = pos.x;
@@ -5511,11 +5515,29 @@ uniform float uDim;
             totalStarsCount.textContent = runStars;
             totalStarsCount.classList.remove('bounce-active');
         }
+        // Secret rings. All-time, not run-scoped like the two totals beside it, and
+        // written here rather than left to applyTranslations: that painter carries the
+        // displayed text forward so a mid-count-up language switch can't reset the
+        // tally, which on a second playthrough would otherwise re-show a stale count
+        // taken before this run's rings were found.
+        const totalRingsCount = document.getElementById('totalRingsCount');
+        if (totalRingsCount) {
+            totalRingsCount.textContent = window.ringTallyText();
+            totalRingsCount.classList.remove('bounce-active');
+        }
+        // Third beat of the tally, just behind the stars, so the row reads as a
+        // sequence rather than three things flashing at once.
+        const popRings = () => {
+            if (!totalRingsCount) return;
+            totalRingsCount.classList.add('bounce-active');
+            spawnSparklesAround(totalRingsCount);
+        };
         // Lands on the same beat as the hit counter finishing its count-up.
         const popStars = () => {
             if (!totalStarsCount) return;
             totalStarsCount.classList.add('bounce-active');
             spawnSparklesAround(totalStarsCount);
+            setTimeout(popRings, 220);
         };
 
         const spawnSparklesAround = (el) => {
@@ -6147,20 +6169,24 @@ uniform float uDim;
         }
 
         // dust - scaledDt!
-        for (let i = dusts.length - 1; i >= 0; i--) {
-            const du = dusts[i];
-            du.life += scaledDt;
-            const arr = du.points.geometry.attributes.position.array;
-            for (let j = 0; j < du.vels.length; j++) {
-                const v = du.vels[j];
-                v.y -= 2.5 * scaledDt;
-                arr[j * 3] += v.x * scaledDt; arr[j * 3 + 1] += v.y * scaledDt; arr[j * 3 + 2] += v.z * scaledDt;
-            }
-            du.points.geometry.attributes.position.needsUpdate = true;
-            du.points.material.size = Math.max(0.11 * (1 - du.life / 0.55), 0.0001);
-            if (du.life >= 0.55) {
-                ParticlePools.dusts.release(du);
-                dusts.splice(i, 1);
+        if (dusts.length > 0) {
+            const dustDrag = Math.exp(-scaledDt * 1.4);
+            for (let i = dusts.length - 1; i >= 0; i--) {
+                const du = dusts[i];
+                du.life += scaledDt;
+                const arr = du.points.geometry.attributes.position.array;
+                for (let j = 0; j < du.vels.length; j++) {
+                    const v = du.vels[j];
+                    v.multiplyScalar(dustDrag);
+                    v.y -= 2.5 * scaledDt;
+                    arr[j * 3] += v.x * scaledDt; arr[j * 3 + 1] += v.y * scaledDt; arr[j * 3 + 2] += v.z * scaledDt;
+                }
+                du.points.geometry.attributes.position.needsUpdate = true;
+                du.points.material.size = Math.max(0.15 * (1 - du.life / 0.55), 0.0001);
+                if (du.life >= 0.55) {
+                    ParticlePools.dusts.release(du);
+                    dusts.splice(i, 1);
+                }
             }
         }
 
@@ -6183,19 +6209,23 @@ uniform float uDim;
         }
 
         // sparkles - scaledDt!
-        for (let i = sparkles.length - 1; i >= 0; i--) {
-            const sp = sparkles[i];
-            sp.life += scaledDt;
-            const arr = sp.points.geometry.attributes.position.array;
-            arr[0] += sp.vel.x * scaledDt;
-            arr[1] += sp.vel.y * scaledDt;
-            arr[2] += sp.vel.z * scaledDt;
-            sp.points.geometry.attributes.position.needsUpdate = true;
-            const k = sp.life / sp.maxLife;
-            sp.points.material.opacity = 1.0 - k;
-            if (k >= 1.0) {
-                ParticlePools.sparkles.release(sp);
-                sparkles.splice(i, 1);
+        if (sparkles.length > 0) {
+            const sparkDrag = Math.exp(-scaledDt * 2.2);
+            for (let i = sparkles.length - 1; i >= 0; i--) {
+                const sp = sparkles[i];
+                sp.life += scaledDt;
+                sp.vel.multiplyScalar(sparkDrag);
+                const arr = sp.points.geometry.attributes.position.array;
+                arr[0] += sp.vel.x * scaledDt;
+                arr[1] += sp.vel.y * scaledDt;
+                arr[2] += sp.vel.z * scaledDt;
+                sp.points.geometry.attributes.position.needsUpdate = true;
+                const k = sp.life / sp.maxLife;
+                sp.points.material.opacity = 1.0 - k;
+                if (k >= 1.0) {
+                    ParticlePools.sparkles.release(sp);
+                    sparkles.splice(i, 1);
+                }
             }
         }
 
@@ -6485,6 +6515,21 @@ uniform float uDim;
     hud.again.addEventListener('pointerup', nextTrial);
     hud.again.addEventListener('click', nextTrial);
 
+    // Replay the level just finished, for a better star rank. Routed through the same
+    // transition as the forward button so it inherits the levelTransitioning /
+    // adInFlight guard — without it a double-tap on the circle would kick off two
+    // builds of the same level. Same pointerup+click pairing as above, for the same
+    // touch-synthesis reason.
+    function retryLevel(e) {
+        if (e) e.preventDefault();
+        goToLevelWithInterstitial(level);
+    }
+    const retryBtn = document.getElementById('winRetry');
+    if (retryBtn) {
+        retryBtn.addEventListener('pointerup', retryLevel);
+        retryBtn.addEventListener('click', retryLevel);
+    }
+
     // Level select bridge (called by the LEVELS button overlay)
     window.CubeCrackerGoToLevel = (i) => {
         if (typeof i !== 'number' || i < 0 || i >= LEVELS.length) return;
@@ -6707,6 +6752,22 @@ uniform float uDim;
         // it with null on failure still flips the gate that lets writes through.
         const saved = await withTimeout(sdk.loadJSON(), 5000, null);
         window.applySavedState(saved);
+
+        // Drop a returning player back on the level they left. build() directly, not
+        // goToLevelWithInterstitial: a cold boot must never open on an ad break, and
+        // there is no level to transition away from yet.
+        //
+        // `interacted` is the gate that matters. The game has been live and playable
+        // for the whole time this read was in flight, so the player may already be
+        // swinging at the Stone Cube — rebuilding the scene under them mid-strike is
+        // worse than losing the resume. Bail on any sign of that, and on a record
+        // that just points at the level already loaded.
+        const resumeLevel = window.savedLevel;
+        if (typeof resumeLevel === 'number' && resumeLevel > 0 && resumeLevel < LEVELS.length &&
+            level === 0 && !interacted && strikes === 0 && !levelTransitioning) {
+            level = resumeLevel;
+            build();
+        }
 
         // Re-assert the ranked value for a returning player, in case an earlier
         // submission never reached the platform. Nothing to say for a new one.
