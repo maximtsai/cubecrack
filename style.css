@@ -24,6 +24,19 @@
     --u: calc((6px + 1vmin) / 16);
     --gold: #e8c98a;
     --dim: rgba(232, 222, 204, 0.5);
+
+    /* Fine positional nudges for the top-bar furniture. Zero by default, so
+       landscape — where the corridor beside the title is wide anyway — gets the
+       untouched layout. Portrait switches them on below. */
+    --nudge-right: 0px;
+    --nudge-left: 0px;
+}
+
+@media (orientation: portrait) {
+    :root {
+        --nudge-right: 8px;
+        --nudge-left: 4px;
+    }
 }
 
 * {
@@ -131,6 +144,10 @@ body {
 }
 
 h1 {
+    /* nudged off dead-centre to balance against the Levels control opposite;
+       portrait only — see --nudge-right */
+    position: relative;
+    left: var(--nudge-right);
     font-size: calc(var(--u) * 26);
     font-weight: 700;
     letter-spacing: 0.3em;
@@ -249,7 +266,7 @@ h1 {
 #ring-badge {
     position: absolute;
     top: calc(var(--u) * -1);
-    left: calc(100% + calc(var(--u) * 34));
+    left: calc(100% + calc(var(--u) * 34) + var(--nudge-right));
     /* normal slot gap + the old 10px ring offset */
     width: calc(var(--u) * 32);
     height: calc(var(--u) * 32);
@@ -1271,7 +1288,7 @@ body.ad-playing #overlay {
     position: fixed;
     /* Align with the Options control; the title's narrowed wrap-safe column stays clear. */
     top: max(calc(var(--u) * -6), env(safe-area-inset-top));
-    left: max(calc(var(--u) * -26), env(safe-area-inset-left));
+    left: calc(max(calc(var(--u) * -26), env(safe-area-inset-left)) - var(--nudge-left));
     height: calc(var(--u) * 132);
     min-width: calc(var(--u) * 132);
     padding: 0 calc(var(--u) * 38);

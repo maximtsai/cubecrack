@@ -19,6 +19,9 @@
     <!-- Cinzel ships with the game. Preloaded because the stylesheet only
          discovers it one parse later, and the loading screen waits on it. -->
     <link rel="preload" href="font/Cinzel-VariableFont_wght.ttf" as="font" type="font/ttf" crossorigin="anonymous">
+    <!-- Ships with the game rather than relying on a /favicon.ico probe. sprites/ is
+         already in build.js's ASSET_DIRS, so it lands at the same relative path in dist. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="sprites/favicon.png">
     <link rel="stylesheet" href="style.css">
 
 </head>
