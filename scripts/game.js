@@ -244,9 +244,15 @@
         if (_gpuTier) return _gpuTier;
         const tier = { mobile: false, weak: false };
         let gpu = '';
+        let hasWebGL2 = false;
         try {
             const c = document.createElement('canvas');
-            const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+            // webgl2 first: whether it exists at all is the single best age signal
+            // available here, and the context is being created for the renderer
+            // string anyway. Android Chrome shipped it in 2017, iOS in 15.
+            const gl2 = c.getContext('webgl2');
+            hasWebGL2 = !!gl2;
+            const gl = gl2 || c.getContext('webgl') || c.getContext('experimental-webgl');
             if (gl) {
                 const ext = gl.getExtension('WEBGL_debug_renderer_info');
                 if (ext) gpu = (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '').toLowerCase();
@@ -258,14 +264,35 @@
         if (/apple\s*(?:gpu|a\d|m\d)/.test(gpu) && navigator.maxTouchPoints > 1) tier.mobile = true;
         if (/android|iphone|ipod|ipad|mobile/i.test(navigator.userAgent)) tier.mobile = true;
         if (tier.mobile) {
-            // Specific slow GPU families, or memory/CPU-starved phones. Adreno 6xx (e.g.
-            // the 640 in the optimisation notes) is genuinely fast — mobile, not weak.
-            if (/powervr|mali|videocore|vivante|adreno(?: \(tm\))? [2-5]\d\d/.test(gpu)) {
-                tier.weak = true;
-            } else if ((navigator.deviceMemory && navigator.deviceMemory <= 4) ||
-                navigator.hardwareConcurrency <= 4) {
-                tier.weak = true;
-            }
+            // `weak` is deliberately hard to earn: capable until proven otherwise.
+            //
+            // It used to match `mali` unqualified, which is Arm's whole line from the
+            // 2011 Mali-400 to a current Immortalis — roughly half of all Android,
+            // every Pixel included — and `deviceMemory <= 4`, which is really an 8 GB
+            // threshold because that value is quantised to powers of two and capped at
+            // 8, so any 6 GB phone reported 4. Between them a large majority of phones
+            // were demoted to 1:1 pixels and no MSAA.
+            //
+            // What survives here is meant to catch only hardware that genuinely cannot
+            // hold a frame rate on this scene. Anything subtler than that is the frame
+            // -time sampler's job, not a device string's — a static list cannot know
+            // about thermal throttling or a device released after it was written.
+
+            // Pre-2016 Arm (Utgard Mali-400/450, Midgard Mali-T###) and pre-2016
+            // Qualcomm (Adreno 2xx-4xx). Adreno 5xx is excluded on purpose: the 530
+            // and 540 were flagship parts and clear this scene comfortably.
+            const ancientGpu = /mali-?(?:400|450|t\d{3})|adreno(?: \(tm\))? [2-4]\d\d/.test(gpu);
+
+            // No WebGL2 at all — predates anything that will run this well.
+            const preWebGL2 = !hasWebGL2;
+
+            // Corroboration required, not either/or: <=2 after quantisation means a
+            // genuinely 2-3 GB device, and it must ALSO be core-starved. Either alone
+            // is too easy to trip on a quirky reading.
+            const starved = navigator.deviceMemory && navigator.deviceMemory <= 2 &&
+                navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+
+            if (ancientGpu || preWebGL2 || starved) tier.weak = true;
         }
         _gpuTier = tier;
         return tier;

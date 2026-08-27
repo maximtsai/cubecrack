@@ -108,7 +108,12 @@ result, never to skip the probe:
 ```js
 let gpu = '';
 const c = document.createElement('canvas');
-const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+// webgl2 FIRST: whether it exists at all is the best age signal available here,
+// and the context is being created for the renderer string anyway. Android Chrome
+// shipped it in 2017, iOS in 15 - its absence means genuinely old hardware.
+const gl2 = c.getContext('webgl2');
+const hasWebGL2 = !!gl2;
+const gl = gl2 || c.getContext('webgl') || c.getContext('experimental-webgl');
 if (gl) {
   const ext = gl.getExtension('WEBGL_debug_renderer_info');
   if (ext) gpu = (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '').toLowerCase();
@@ -129,25 +134,70 @@ The instinct is a single `isWeak()` boolean. That is wrong, and it is why device
 slipped through even after a GPU allowlist was added: an Adreno 640 is genuinely fast
 and does not belong on a "weak GPU" list. It still needs mobile pixel budgets.
 
-- **`mobile`** — any phone/tablet-class GPU, however fast. Cap pixel ratio, disable MSAA.
-- **`weak`** — the slow end of that set. Additionally drop to 1:1 and skip cosmetic layers.
+- **`mobile`** — any phone/tablet-class GPU, however fast. Cap pixel ratio.
+- **`weak`** — the slow end of that set. Additionally drop to 1:1, disable MSAA, and
+  skip cosmetic layers.
 
-`weak` is a subset of `mobile`. Detect `mobile` from the GPU family; detect `weak`
-from specific slow families plus `deviceMemory`, `hardwareConcurrency`, OS version,
-and screen size.
+`weak` is a subset of `mobile`. Detect `mobile` from the GPU family; over-matching
+there is harmless. `weak` is the hard one — see below.
 
 Verify against a table of real device strings rather than eyeballing regexes:
 
 | device | mobile | weak | MSAA | eff. DPR |
 |---|---|---|---|---|
-| PowerVR GE8320 | ✅ | ✅ | off | 1.0 |
-| Adreno 640 | ✅ | ❌ | off | 1.5 |
+| Mali-T720 (2014 Midgard) | ✅ | ✅ | off | 1.0 |
+| Mali-G710 (Tensor G3) | ✅ | ❌ | on | 1.5 |
+| Adreno 640 | ✅ | ❌ | on | 1.5 |
+| PowerVR GE8320 | ✅ | ❌ | on | 1.5 |
 | Desktop NVIDIA | ❌ | ❌ | on | 2.0 |
-| iPad (desktop UA + touch) | ✅ | ❌ | off | 1.5 |
+| iPad (desktop UA + touch) | ✅ | ❌ | on | 1.5 |
 | Mac M3 (Apple GPU, no touch) | ❌ | ❌ | on | 2.0 |
-| Masked renderer + mobile UA | ✅ | ❌ | off | 1.5 |
+| Masked renderer + mobile UA | ✅ | ❌ | on | 1.5 |
 
 The last three rows are the ones that catch regressions. Guard them explicitly.
+
+### Detecting `weak`: two traps
+
+Both shipped here; together they demoted an estimated **65-75% of all phones**,
+every Pixel included.
+
+**Match GPU generations, not vendors.** `/mali/` spans Arm's whole line — 2011
+Mali-400 through current Immortalis — across MediaTek, UNISOC, Exynos, Kirin and
+Tensor: ~half of all Android. The adjacent Qualcomm test was correctly scoped
+(`adreno [2-4]\d\d`); Arm was not.
+
+**`deviceMemory` is quantised to powers of two and capped at 8.** So `<= 4` means
+"under 8 GB" — most of the mid-range. Use `<= 2`, AND-ed with a second signal.
+
+Replacement, deliberately hard to earn:
+
+```js
+// pre-2016 Arm (Utgard 400/450, Midgard T###) and pre-2016 Qualcomm (2xx-4xx).
+// Adreno 5xx is excluded on purpose: the 530/540 were flagships and are fine.
+const ancientGpu = /mali-?(?:400|450|t\d{3})|adreno(?: \(tm\))? [2-4]\d\d/.test(gpu);
+const preWebGL2  = !hasWebGL2;                    // predates ~2017 Android / iOS 15
+const starved    = navigator.deviceMemory <= 2 && // AND, not OR
+                   navigator.hardwareConcurrency <= 4;
+if (ancientGpu || preWebGL2 || starved) tier.weak = true;
+```
+
+Verify against real renderer strings in CI, not by eyeballing the regex:
+`mali-g715-immortalis mc11` and `mali-t880 mp12` differ by a few characters
+and sit on opposite sides.
+
+### Static lists cannot predict frame rate
+
+They miss thermal throttling, chips newer than the regex, and loaded devices. Split
+the decision:
+
+- **Boot: only what is immutable.** In WebGL that is `antialias` alone (§3, §13).
+- **Runtime: everything else.** Pixel ratio and effect budgets are live-adjustable —
+  drive them from sampled frame time.
+
+This lets the static test be optimistic; it only has to be right about one cheap call.
+Sampler: median (not mean — one GC pause is not a slow phone) over a rolling window,
+skip ~45 warm-up frames, require two consecutive bad windows, demote one-way.
+Oscillating pixel ratio looks worse than sitting one notch conservative.
 
 ---
 
@@ -167,17 +217,21 @@ shipped mobile games sit at 1.0–1.25.
 
 ---
 
-## 3. Disable MSAA on all mobile GPUs
+## 3. Disable MSAA on weak GPUs only
 
 `antialias: true` is priced per sample per pixel, so it **compounds** with pixel ratio.
-Gate it on the `mobile` tier, not `weak`:
 
 ```js
-new THREE.WebGLRenderer({ antialias: !tier.mobile, /* ... */ })
+new THREE.WebGLRenderer({ antialias: !tier.weak, /* ... */ })
 ```
 
-At 1.5×+ density on a phone screen, MSAA buys very little. Note the attribute is
-immutable after context creation — you must decide before constructing the renderer.
+Previously gated on `mobile`, which was too broad: capable phones got neither MSAA nor
+full resolution, and with no FXAA/SMAA fallback the result read as pixellated. On
+tile-based mobile GPUs MSAA is cheap and resolution is expensive — cut resolution
+first (§2), drop MSAA only at 1:1.
+
+Immutable after context creation, which is why it should be the only thing the static
+tier test decides (§1).
 
 ---
 
@@ -192,7 +246,7 @@ creation throw. Pair it with the retry in §13 so a rejected hint degrades inste
 black-screening.
 
 ```js
-new THREE.WebGLRenderer({ antialias: !tier.mobile, alpha: true, powerPreference: 'high-performance' });
+new THREE.WebGLRenderer({ antialias: !tier.weak, alpha: true, powerPreference: 'high-performance' });
 ```
 
 Confirm it stuck — the browser may not honour it:
@@ -485,7 +539,7 @@ retry bare before giving up:
 ```js
 let renderer = null;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: !tier.mobile, alpha: true,
+  renderer = new THREE.WebGLRenderer({ antialias: !tier.weak, alpha: true,
                                        powerPreference: 'high-performance' });
 } catch (err) {
   try {
